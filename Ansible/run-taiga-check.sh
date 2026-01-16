@@ -14,6 +14,11 @@ fi
 extra_vars=()
 private_key_args=()
 
+default_key="$HOME/.ssh/id_ed25519_common"
+if [[ -f "$default_key" ]]; then
+	private_key_args+=("--private-key" "$default_key")
+fi
+
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 		--bastion)
@@ -21,7 +26,7 @@ while [[ $# -gt 0 ]]; do
 			shift
 			;;
 		--key)
-			private_key_args+=("--private-key" "${2:?missing key path}")
+			private_key_args=("--private-key" "${2:?missing key path}")
 			shift 2
 			;;
 		*)

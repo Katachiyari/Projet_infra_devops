@@ -80,7 +80,7 @@ variable "ansible_group_by_tag" {
   description = "Map de tags Proxmox (en minuscules) vers des groupes Ansible (ex: tools -> taiga_hosts)."
   default = {
     tools = "taiga_hosts"
-    dns   = "bind9dns"
-    bind9 = "bind9dns"
+    dns   = "bind9_hosts"
+    bind9 = "bind9_hosts"
   }
 }

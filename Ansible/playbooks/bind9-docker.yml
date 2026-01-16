@@ -1,6 +1,6 @@
 ---
 - name: Bind9 (systemli.bind9)
-  hosts: bind9dns
+  hosts: bind9_hosts
   become: true
   roles:
     - systemli.bind9

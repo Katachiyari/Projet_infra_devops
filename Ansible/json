@@ -1,0 +1,80 @@
+{
+    "_meta": {
+        "hostvars": {
+            "bind9dns": {
+                "ansible_host": "172.16.100.254",
+                "ansible_ssh_common_args": "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}",
+                "bastion_enabled": false,
+                "bastion_host": "172.16.100.100",
+                "bastion_user": "admin1",
+                "bind9_authoritative": true,
+                "bind9_forward": true,
+                "bind9_forward_servers": [
+                    "1.1.1.1",
+                    "9.9.9.9"
+                ],
+                "bind9_our_networks": [
+                    "172.16.100.0/24",
+                    "localhost"
+                ],
+                "bind9_recursor": true,
+                "bind9_zones_dynamic": [
+                    {
+                        "admin": "postmaster.jdk.lab",
+                        "name": "jdk.lab",
+                        "ns_records": [
+                            "ns1.jdk.lab"
+                        ],
+                        "rrs": [
+                            {
+                                "label": "ns1",
+                                "rdata": "172.16.100.254",
+                                "type": "A"
+                            }
+                        ],
+                        "serial": 2026011601,
+                        "type": "master"
+                    }
+                ]
+            },
+            "tools-manager": {
+                "ansible_host": "172.16.100.20",
+                "ansible_ssh_common_args": "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}",
+                "bastion_enabled": false,
+                "bastion_host": "172.16.100.100",
+                "bastion_user": "admin1",
+                "taiga_attachments_max_age": 360,
+                "taiga_domain": "172.16.100.20:9000",
+                "taiga_email_backend": "console",
+                "taiga_email_default_from": "changeme@example.com",
+                "taiga_email_host": "",
+                "taiga_email_host_user": "",
+                "taiga_email_port": 587,
+                "taiga_email_use_ssl": false,
+                "taiga_email_use_tls": true,
+                "taiga_enable_telemetry": false,
+                "taiga_scheme": "http",
+                "taiga_subpath": "",
+                "taiga_websockets_scheme": "ws"
+            }
+        },
+        "profile": "inventory_legacy"
+    },
+    "all": {
+        "children": [
+            "ungrouped",
+            "bind9_hosts",
+            "taiga_hosts"
+        ]
+    },
+    "bind9_hosts": {
+        "hosts": [
+            "bind9dns"
+        ]
+    },
+    "taiga_hosts": {
+        "hosts": [
+            "tools-manager"
+        ]
+    }
+}

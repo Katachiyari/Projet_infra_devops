@@ -8,7 +8,7 @@ IFS=$'\n\t'
 
 readonly SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly LOG_LEVEL="${LOG_LEVEL:-INFO}"
+LOG_LEVEL="${LOG_LEVEL:-INFO}"
 
 # Color codes
 readonly RED='\033[0;31m'

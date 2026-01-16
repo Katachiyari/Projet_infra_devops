@@ -11,7 +11,7 @@ IFS=$'\n\t'
 
 # Configuration
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly LOG_LEVEL="${LOG_LEVEL:-INFO}"
+LOG_LEVEL="${LOG_LEVEL:-INFO}"
 readonly SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
 
 # Color codes for output

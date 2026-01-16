@@ -1,24 +1,3 @@
-locals {
-  cloud_init_user_data = {
-    for name, n in var.nodes :
-    name => templatefile("${path.module}/cloud-init/user-data.yaml.tftpl", {
-      hostname = name
-    })
-  }
-}
-
-resource "proxmox_virtual_environment_file" "user_data" {
-  for_each     = var.nodes
-  node_name    = var.node_name
-  datastore_id = var.datastore_snippets
-  content_type = "snippets"
-
-  source_raw {
-    data      = local.cloud_init_user_data[each.key]
-    file_name = "user-data-${each.key}.yaml"
-  }
-}
-
 resource "proxmox_virtual_environment_vm" "vm" {
   for_each  = var.nodes
   name      = each.key
@@ -63,22 +42,9 @@ resource "proxmox_virtual_environment_vm" "vm" {
       username = "ansible"
       keys     = [var.ssh_public_key]
     }
-
-    # attache ton cloud-config (installe qemu-guest-agent + hardening)
-    user_data_file_id = proxmox_virtual_environment_file.user_data[each.key].id
-  }
-
-  lifecycle {
-    # Le provider remplace le resource file snippet quand son contenu change.
-    # On évite que ça force le remplacement de la VM.
-    ignore_changes = [
-      initialization[0].user_data_file_id,
-    ]
   }
 
   agent {
-    enabled = true
+	enabled = true
   }
-
-  depends_on = [proxmox_virtual_environment_file.user_data]
 }

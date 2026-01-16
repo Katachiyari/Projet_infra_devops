@@ -7,8 +7,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # Logging utilities
-readonly LOG_LEVEL="${LOG_LEVEL:-INFO}"
-readonly SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+LOG_LEVEL="${LOG_LEVEL:-INFO}"
 
 _log() {
   local level="$1"
@@ -16,7 +15,7 @@ _log() {
   local message="$*"
   local timestamp
   timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
-  echo "[${timestamp}] [${level}] [${SCRIPT_NAME}] ${message}" >&2
+  echo "[${timestamp}] [${level}] [ssh-preflight] ${message}" >&2
 }
 
 _log_info() { [[ "$LOG_LEVEL" =~ ^(DEBUG|INFO)$ ]] && _log "INFO" "$@" || true; }

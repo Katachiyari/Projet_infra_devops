@@ -37,6 +37,48 @@
                     }
                 ]
             },
+            "git-lab": {
+                "ansible_host": "172.16.100.40",
+                "ansible_ssh_common_args": "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}",
+                "bastion_enabled": false,
+                "bastion_host": "172.16.100.100",
+                "bastion_user": "admin1"
+            },
+            "harbor": {
+                "ansible_host": "172.16.100.50",
+                "ansible_ssh_common_args": "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}",
+                "bastion_enabled": false,
+                "bastion_host": "172.16.100.100",
+                "bastion_user": "admin1"
+            },
+            "k3s-manager": {
+                "ansible_host": "172.16.100.250",
+                "ansible_ssh_common_args": "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}",
+                "bastion_enabled": false,
+                "bastion_host": "172.16.100.100",
+                "bastion_user": "admin1"
+            },
+            "k3s-worker-0": {
+                "ansible_host": "172.16.100.251",
+                "ansible_ssh_common_args": "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}",
+                "bastion_enabled": false,
+                "bastion_host": "172.16.100.100",
+                "bastion_user": "admin1"
+            },
+            "k3s-worker-1": {
+                "ansible_host": "172.16.100.252",
+                "ansible_ssh_common_args": "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}",
+                "bastion_enabled": false,
+                "bastion_host": "172.16.100.100",
+                "bastion_user": "admin1"
+            },
+            "reverse-proxy": {
+                "ansible_host": "172.16.100.253",
+                "ansible_ssh_common_args": "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}",
+                "bastion_enabled": false,
+                "bastion_host": "172.16.100.100",
+                "bastion_user": "admin1"
+            },
             "tools-manager": {
                 "ansible_host": "172.16.100.20",
                 "ansible_ssh_common_args": "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}",
@@ -63,11 +105,11 @@
     "all": {
         "children": [
             "ungrouped",
-            "bind9_hosts",
+            "bind9dns",
             "taiga_hosts"
         ]
     },
-    "bind9_hosts": {
+    "bind9dns": {
         "hosts": [
             "bind9dns"
         ]
@@ -75,6 +117,16 @@
     "taiga_hosts": {
         "hosts": [
             "tools-manager"
+        ]
+    },
+    "ungrouped": {
+        "hosts": [
+            "git-lab",
+            "harbor",
+            "k3s-manager",
+            "k3s-worker-0",
+            "k3s-worker-1",
+            "reverse-proxy"
         ]
     }
 }

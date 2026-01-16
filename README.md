@@ -18,5 +18,8 @@
 ## Démarrage (référence)
 1. Crée un fichier `terraform.tfvars` (non versionné) à partir de `terraform.tfvars.example`.
 2. `terraform init`
-3. `terraform apply`
-4. Dans `Ansible/` : `./bootstrap.sh` puis `./run-taiga-apply.sh` (ou `--bastion`).
+3. `terraform plan -input=false` (échoue si une variable manque)
+4. `terraform apply -input=false`
+5. Dans `Ansible/` : `./bootstrap.sh` puis `./run-taiga-apply.sh` (ou `--bastion`).
+
+Astuce: tu peux aussi faire `terraform plan -var-file=terraform.tfvars -input=false`.

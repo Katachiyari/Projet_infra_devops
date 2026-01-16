@@ -2,6 +2,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+source "$(pwd)/lib/ssh-preflight.sh"
+
 inventory_file="inventory/terraform.generated.yml"
 if [[ ! -f "$inventory_file" ]]; then
   inventory_file="inventory/hosts.yml"
@@ -9,13 +11,6 @@ fi
 
 extra_vars=()
 private_key_args=()
-
-# Convenance: si une clé standard existe sur la machine (ex: bastion/management),
-# l'utiliser automatiquement pour éviter les erreurs "Permission denied (publickey)".
-default_key="$HOME/.ssh/id_ed25519_common"
-if [[ -f "$default_key" ]]; then
-  private_key_args+=("--private-key" "$default_key")
-fi
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -33,5 +28,7 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+ssh_preflight "$inventory_file" private_key_args
 
 ansible-playbook -i "$inventory_file" "${private_key_args[@]}" playbooks/ping-test.yml -vv "${extra_vars[@]}"

@@ -2,6 +2,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+source "$(pwd)/lib/ssh-preflight.sh"
+
 inventory_file="inventory/terraform.generated.yml"
 if [[ ! -f "$inventory_file" ]]; then
 	inventory_file="inventory/hosts.yml"
@@ -13,11 +15,6 @@ fi
 
 extra_vars=()
 private_key_args=()
-
-default_key="$HOME/.ssh/id_ed25519_common"
-if [[ -f "$default_key" ]]; then
-	private_key_args+=("--private-key" "$default_key")
-fi
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -35,6 +32,8 @@ while [[ $# -gt 0 ]]; do
 			;;
 	esac
 done
+
+ssh_preflight "$inventory_file" private_key_args
 
 ansible -i "$inventory_file" "${private_key_args[@]}" taiga_hosts -m wait_for_connection -a "timeout=300" -vv "${extra_vars[@]}"
 ansible -i "$inventory_file" "${private_key_args[@]}" taiga_hosts -m ping -vv "${extra_vars[@]}"

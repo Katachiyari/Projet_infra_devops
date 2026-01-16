@@ -70,10 +70,19 @@ _find_matching_private_key() {
 
 _inventory_hosts_and_ips() {
   local inventory_file="$1"
+  local inv_json
+  inv_json="$(ansible-inventory -i "$inventory_file" --list --output json 2>/dev/null || true)"
+  if [[ -z "$inv_json" ]]; then
+    return 0
+  fi
 
-  ansible-inventory -i "$inventory_file" --list | python3 - <<'PY'
+  python3 - <<'PY' "$inv_json" || true
 import json, sys
-inv = json.load(sys.stdin)
+raw = sys.argv[1]
+try:
+    inv = json.loads(raw)
+except Exception:
+    sys.exit(0)
 hostvars = inv.get('_meta', {}).get('hostvars', {})
 hosts = []
 ips = []
@@ -111,8 +120,10 @@ ssh_preflight() {
 
   # If user didn't provide --key, try to pick a key that matches terraform ssh_public_key.
   if [[ ${#__key_args_ref[@]} -eq 0 ]]; then
-    local tfvars_path
-    tfvars_path="$(cd "$(dirname "$0")/.." && pwd)/../terraform.tfvars"
+    local project_root
+    # BASH_SOURCE[0] points to this file even when sourced.
+    project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+    local tfvars_path="$project_root/terraform.tfvars"
     local desired_pubkey
     desired_pubkey="$(_terraform_public_key "$tfvars_path")"
     local matched

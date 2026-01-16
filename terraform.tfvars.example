@@ -20,6 +20,8 @@ ssh_public_key = "ssh-ed25519 AAAA... your-key"
 # Exemple de mapping tag -> groupe Ansible (optionnel)
 ansible_group_by_tag = {
   tools = "taiga_hosts"
+  dns   = "bind9_hosts"
+  bind9 = "bind9_hosts"
 }
 
 # Exemple de nodes

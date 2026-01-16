@@ -1,0 +1,6 @@
+---
+- name: Bind9 Docker
+  hosts: bind9dns
+  become: true
+  roles:
+    - bind9_docker

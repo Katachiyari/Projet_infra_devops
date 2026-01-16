@@ -1,0 +1,21 @@
+# URL / domaine
+taiga_scheme: "http"
+taiga_domain: "172.16.100.20:9000"
+taiga_websockets_scheme: "ws"
+taiga_subpath: ""
+
+# Email (valeurs sûres par défaut)
+# "console" évite une config Django invalide tout en gardant Taiga fonctionnel.
+taiga_email_backend: "console"
+taiga_email_host: ""
+taiga_email_port: 587
+taiga_email_host_user: ""
+taiga_email_default_from: "changeme@example.com"
+taiga_email_use_tls: true
+taiga_email_use_ssl: false
+
+# Telemetry (au choix)
+taiga_enable_telemetry: false
+
+# Attachments
+taiga_attachments_max_age: 360

@@ -1,0 +1,65 @@
+pm_host         = "10.250.250.4"
+pm_token_id     = "terraform-jdk@pve4!jdk-token"
+pm_token_secret = "c4a17231-fab8-4cd6-801e-bc0dd0251b1c"
+
+proxmox_node = "pve4"
+template_id  = 9000
+
+disk_storage = "local-lvm"
+net_bridge   = "vmbr23"
+
+vmid_start = 6000
+gateway    = "172.16.100.1"
+
+ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE30vg7EchnxPkkVvAnbi0Ey55NGWRiUNE1ClsUvCj7d vm-common-key"
+
+vm_definitions = {
+  bind9dns = {
+    cores  = 2
+    memory = 1024
+    disk   = 20
+    ip     = "172.16.100.254"
+  }
+  git-lab = {
+    cores  = 4
+    memory = 8192
+    disk   = 30
+    ip     = "172.16.100.40"
+  }
+  harbor = {
+    cores  = 2
+    memory = 4096
+    disk   = 50
+    ip     = "172.16.100.50"
+  }
+  k3s-manager = {
+    cores  = 4
+    memory = 8192
+    disk   = 60
+    ip     = "172.16.100.250"
+  }
+  k3s-worker-0 = {
+    cores  = 2
+    memory = 4096
+    disk   = 40
+    ip     = "172.16.100.251"
+  }
+  k3s-worker-1 = {
+    cores  = 2
+    memory = 4096
+    disk   = 40
+    ip     = "172.16.100.252"
+  }
+  reverse-proxy = {
+    cores  = 2
+    memory = 4096
+    disk   = 20
+    ip     = "172.16.100.253"
+  }
+  tools-manager = {
+    cores  = 2
+    memory = 4096
+    disk   = 60
+    ip     = "172.16.100.20"
+  }
+}

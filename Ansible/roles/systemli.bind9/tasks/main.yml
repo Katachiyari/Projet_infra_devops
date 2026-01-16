@@ -1,0 +1,195 @@
+---
+- name: Install bind9 packages
+  ansible.builtin.apt:
+    pkg: "{{ bind9_packages }}"
+    state: present
+    cache_valid_time: 600
+
+- name: Setup logs
+  when: bind9_named_logging
+  block:
+    - name: Ensure existence of the log directory
+      ansible.builtin.file:
+        path: "{{ bind9_log_path }}"
+        state: directory
+        owner: "{{ bind9_user }}"
+        group: "{{ bind9_group }}"
+        mode: 0755
+
+    - name: Configure log rotate for bind9
+      ansible.builtin.template:
+        src: "{{ bind9_templates | default('') }}logrotate.d/bind.j2"
+        dest: /etc/logrotate.d/bind
+        owner: root
+        group: "{{ bind9_group }}"
+        mode: 0644
+
+- name: Create dynamic DNS keys
+  ansible.builtin.include_tasks: create_ddns_keys.yml
+  loop: "{{ bind9_zones_static + bind9_zones_dynamic }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: bind9_generate_ddns_key | bool
+
+- name: Configure bind9 named.conf files
+  ansible.builtin.template:
+    src: "{{ bind9_templates | default('') }}bind/{{ item }}.j2"
+    dest: /etc/bind/{{ item }}
+    owner: root
+    group: "{{ bind9_group }}"
+    mode: "0644"
+  loop:
+    - named.conf.local
+    - named.conf.options
+  notify:
+    - Reload bind9
+  # Variable register for eventual use outside the role
+  register: bind9_named_conf
+
+- name: Check validity of named.conf
+  ansible.builtin.command: named-checkconf
+  register: bind9_reg_named_checkconf
+  become: true
+  become_user: "{{ bind9_user }}"
+  changed_when: False
+  vars:
+    ansible_ssh_pipelining: True
+
+- name: Create bind9 directory for master zones
+  ansible.builtin.file:
+    path: "{{ bind9_zonedir }}"
+    state: directory
+    owner: root
+    group: "{{ bind9_group }}"
+    mode: "02775"
+  when: bind9_authoritative
+
+- name: Create bind9 directory for master zone includes
+  ansible.builtin.file:
+    path: "{{ bind9_zonedir }}/includes"
+    state: directory
+    owner: root
+    group: "{{ bind9_group }}"
+    mode: "0755"
+  when: bind9_authoritative
+
+- name: Install bind9 authoritative include files
+  ansible.builtin.template:
+    src: "bind/zones/includes/{{ item }}.j2"
+    dest: "{{ bind9_zonedir }}/includes/{{ item }}"
+    owner: root
+    group: "{{ bind9_group }}"
+    mode: "0644"
+  loop: "{{ bind9_authoritative_includes }}"
+  when: bind9_authoritative
+  notify:
+    - Zone file change
+    - Reload bind9
+
+- name: Install bind9 rndc key
+  ansible.builtin.template:
+    src: "{{ bind9_templates | default('') }}bind/rndc.key.j2"
+    dest: /etc/bind/rndc.key
+    owner: "{{ bind9_user }}"
+    group: "{{ bind9_group }}"
+    mode: "0640"
+  when: bind9_rndc_key != ""
+  notify:
+    - Restart bind9
+  tags:
+    - role:bind9:rndc_key
+
+- name: Create bind9 directory for keys
+  ansible.builtin.file:
+    path: "{{ bind9_keydir }}"
+    state: directory
+    owner: "{{ bind9_user }}"
+    group: "{{ bind9_group }}"
+    mode: 02750
+  when: bind9_authoritative
+  tags:
+    - role:bind9:ddns
+    - role:bind9:dnssec
+
+# TODO: DDNS: move keys into vault file
+- name: Copy over DDNS keys for zones with update_keyfile
+  ansible.builtin.copy:
+    src: bind/zones/{{ item.update_keyfile }}.key
+    dest: "{{ bind9_keydir }}/{{ item.update_keyfile }}.key"
+    owner: "{{ bind9_user }}"
+    group: "{{ bind9_group }}"
+    mode: "0644"
+  loop: "{{ bind9_zones_static + bind9_zones_dynamic }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - bind9_authoritative
+    - item.type | default(bind9_zone_type) == 'master'
+    - item.update_keyfile is defined and item.update_keyfile != ""
+
+- name: Copy over DDNS private keys for zones with update_keyfile
+  ansible.builtin.copy:
+    src: bind/zones/{{ item.update_keyfile }}.private
+    dest: "{{ bind9_keydir }}/{{ item.update_keyfile }}.private"
+    owner: "{{ bind9_user }}"
+    group: "{{ bind9_group }}"
+    mode: "0600"
+  loop: "{{ bind9_zones_static + bind9_zones_dynamic }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - bind9_authoritative
+    - item.type | default(bind9_zone_type) == 'master'
+    - item.update_keyfile is defined and item.update_keyfile != ""
+
+- name: Create dynamic bind9 zone files
+  ansible.builtin.template:
+    src: "{{ bind9_templates | default('') }}bind/zones/db.template.j2"
+    dest: "{{ bind9_zonedir }}/db.{{ item.name }}"
+    owner: root
+    group: "{{ bind9_group }}"
+    mode: "0644"
+  loop: "{{ bind9_zones_dynamic }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - bind9_authoritative
+    - item.type | default(bind9_zone_type) == 'master'
+  notify:
+    - Zone file change
+    - Reload bind9
+  tags:
+    - role:bind9:zones
+
+- name: Install static bind9 zone files
+  ansible.builtin.copy:
+    src: bind/zones/db.{{ item.name }}
+    dest: "{{ bind9_zonedir }}/db.{{ item.name }}"
+    owner: root
+    group: "{{ bind9_group }}"
+    mode: "0644"
+    force: "{{ item.force_update | default('yes') }}"
+  loop: "{{ bind9_zones_static }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - bind9_authoritative
+    - item.type | default(bind9_zone_type) == 'master'
+  notify:
+    - Zone file change
+    - Reload bind9
+  tags:
+    - role:bind9:zones
+
+- name: Check validity of zone files
+  ansible.builtin.command: named-checkzone {{ item.name }} {{ bind9_zonedir }}/db.{{ item.name }}
+  register: bind9_reg_named_checkzone
+  become: true
+  become_user: "{{ bind9_user }}"
+  loop: "{{ bind9_zones_dynamic + bind9_zones_static }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.type | default(bind9_zone_type) == 'master'
+  changed_when: False
+  vars:
+    ansible_ssh_pipelining: True

@@ -1,0 +1,7 @@
+---
+- name: Déployer Taiga (Docker Compose)
+  hosts: taiga_hosts
+  become: true
+  gather_facts: true
+  roles:
+    - taiga

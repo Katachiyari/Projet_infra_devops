@@ -1,0 +1,114 @@
+options {
+	directory "/var/cache/bind";
+{% if bind9_forward|default() %}
+	// If there is a firewall between you and nameservers you want
+	// to talk to, you may need to fix the firewall to allow multiple
+	// ports to talk.  See http://www.kb.cert.org/vuls/id/800113
+
+	// If your ISP provided one or more IP addresses for stable 
+	// nameservers, you probably want to use them as forwarders.  
+	// Uncomment the following block, and insert the addresses replacing 
+	// the all-0's placeholder.
+
+    forwarders {
+{%   for forwarder in bind9_forward_servers %}
+        {{ forwarder }};
+{%   endfor %}
+    };
+{% endif %}
+
+	//========================================================================
+	// If BIND logs error messages about the root key being expired,
+	// you will need to update your keys.  See https://www.isc.org/bind-keys
+	//========================================================================
+	dnssec-validation {{ bind9_dnssec_validation }};
+	qname-minimization {{ bind9_qname_minimization }};
+
+	listen-on-v6 { any; };
+	recursion {{ bind9_recursor|default()|ternary('yes', 'no') }};
+	allow-recursion { {{ bind9_recursor|default()|ternary('our_networks', 'none') }}; };
+
+	allow-query { {% if bind9_hidden_master|default() %}our_neighbors{% elif bind9_authoritative|default() %}any{% else %}our_networks{% endif %}; };
+{% if bind9_authoritative|default() %}
+
+	allow-transfer { our_neighbors; };
+{% endif %}
+{% if bind9_slaves|default() %}
+
+	// List of secondary nameservers to notify for every zone update
+	also-notify {
+{%   for slave in bind9_slaves %}
+		{{ slave }};
+{%   endfor %}
+	};
+{% endif %}
+{% if bind9_notify_explicit|default() %}
+
+	// Notify only nameservers from also-notify, not from NS RRs in zones
+	notify explicit;
+{% endif %}
+{% if bind9_dnssec|default() %}
+
+	// Look here for DNSSEC keys
+	key-directory "{{ bind9_keydir }}";
+{% endif %}
+};
+
+{% if bind9_dnssec_policies|default() %}
+{%   for policy in bind9_dnssec_policies %}
+dnssec-policy {{ policy.name }} {
+	keys {
+{%     for key in policy.dnssec_keys %}
+		{{ key }};
+{%     endfor %}
+	};
+};
+{%   endfor %}
+{% endif %}
+
+{% if bind9_zones_static|selectattr('update_key_secret','defined')|list|default() %}
+{%   for zone in bind9_zones_static|selectattr('update_key_secret','defined')|list|default([]) %}
+{%     if zone_type|default(bind9_zone_type|default('master')) == 'master' %}
+{%       if loop.first %}
+// The following keys are used for dynamic DNS updates
+{%       endif %}
+key "{{ zone.name }}_ddns_update" {
+	algorithm {{ zone.update_key_algorithm|default('hmac-sha512') }};
+	secret "{{ zone.update_key_secret|default() }}";
+};
+{%     endif %}
+{%   endfor %}
+{% endif %}
+
+acl our_networks {
+	// Permitted for queries
+{% if bind9_our_networks|default() %}
+{%   for network in bind9_our_networks %}
+	{{ network }};
+{%   endfor %}
+{% endif %}
+};
+
+acl our_neighbors {
+	// Permitted for transfers
+{% if bind9_our_neighbors|default() %}
+{%   for network in bind9_our_neighbors %}
+	{{ network }};
+{%   endfor %}
+{% endif %}
+};
+
+{% if bind9_named_logging %}
+logging {
+  channel bind_log {
+    file "{{ bind9_log_path }}/bind.log" versions {{ bind9_log_versions }} size {{ bind9_log_size }};
+    severity {{ bind9_log_severity }};
+    print-category yes;
+    print-severity yes;
+    print-time yes;
+  };
+  {% for category in bind9_log_categories %}
+  category {{ category.name }} { {{ category.destination }}; };
+  {% endfor %}
+};
+{% endif %}

@@ -1,0 +1,86 @@
+---
+# --- Docker officiel (tag docker) ---
+- name: Paquets requis APT over HTTPS
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+    update_cache: true
+  tags: [docker]
+
+- name: Créer /etc/apt/keyrings
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+  tags: [docker]
+
+- name: Ajouter la clé GPG Docker
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/debian/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+  tags: [docker]
+
+- name: Ajouter le repo officiel Docker (Debian)
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
+    state: present
+    filename: docker
+  tags: [docker]
+
+- name: Installer Docker officiel + plugins
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: true
+  tags: [docker]
+
+# --- Taiga (tag taiga) ---
+- name: Reset taiga (optionnel)
+  ansible.builtin.file:
+    path: /opt/taiga
+    state: absent
+  tags: [taiga_reset]
+
+- name: Créer dossiers taiga (repo + config)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /opt/taiga
+    - /opt/taiga/src
+    - /opt/taiga/config
+  tags: [taiga]
+
+- name: Cloner taiga-docker
+  ansible.builtin.git:
+    repo: "https://github.com/taigaio/taiga-docker.git"
+    dest: /opt/taiga/src
+    version: stable
+    update: true
+  tags: [taiga]
+
+- name: Déployer .env (hors repo git)
+  ansible.builtin.template:
+    src: "{{ role_path }}/templates/taiga.env.j2"
+    dest: /opt/taiga/config/.env
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  tags: [taiga]
+
+- name: Up Taiga (compose avec env-file)
+  ansible.builtin.command: docker compose --env-file /opt/taiga/config/.env up -d
+  args:
+    chdir: /opt/taiga/src
+  tags: [taiga]

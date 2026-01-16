@@ -1,0 +1,12 @@
+---
+- name: Test ping/pong VMs Proxmox
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Ping connectivity
+      ansible.builtin.ping:
+      register: ping_result
+
+    - name: Afficher résultat
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: {{ 'SUCCESS' if ping_result.ping == 'pong' else 'FAILED' }}"

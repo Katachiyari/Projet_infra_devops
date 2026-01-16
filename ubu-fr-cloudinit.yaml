@@ -1,0 +1,7 @@
+#cloud-config
+locale: fr_FR.UTF-8
+timezone: Europe/Paris
+
+keyboard:
+  layout: fr
+  variant: ''

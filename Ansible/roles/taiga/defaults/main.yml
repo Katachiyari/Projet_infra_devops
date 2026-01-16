@@ -1,0 +1,42 @@
+---
+taiga_install_dir: /opt/taiga
+taiga_repo: "https://github.com/taigaio/taiga-docker.git"
+taiga_repo_version: "stable"
+
+# URLs (à adapter si reverse-proxy)
+taiga_scheme: "http"
+# Compat: ancien nom (non utilisé par le template)
+taiga_host: "taiga.local"
+# Nom réellement consommé par le template taiga.env.j2
+taiga_domain: "{{ taiga_host }}"
+taiga_subpath: ""
+
+# Websockets (ws/wss)
+taiga_websockets_scheme: "ws"
+
+# DevSecOps: secrets à surcharger via inventory + vault (ne pas laisser en dur)
+taiga_postgres_user: "taiga"
+taiga_postgres_password: "CHANGE_ME"
+taiga_secret_key: "CHANGE_ME"
+
+# RabbitMQ (utilisé par taiga-docker)
+taiga_rabbitmq_user: "taiga"
+taiga_rabbitmq_pass: "taiga"
+taiga_rabbitmq_vhost: "taiga"
+taiga_rabbitmq_erlang_cookie: "CHANGE_ME"
+
+# Email (par défaut: console pour éviter une config cassée)
+taiga_email_backend: "console"  # "console" ou "smtp"
+taiga_email_host: ""
+taiga_email_port: 587
+taiga_email_host_user: ""
+taiga_email_host_password: ""
+taiga_email_default_from: "changeme@example.com"
+taiga_email_use_tls: true
+taiga_email_use_ssl: false
+
+# Telemetry
+taiga_enable_telemetry: false
+
+# Attachments
+taiga_attachments_max_age: 360

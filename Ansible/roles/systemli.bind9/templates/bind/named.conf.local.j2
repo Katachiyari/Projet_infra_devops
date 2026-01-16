@@ -1,0 +1,81 @@
+//
+// Do any local configuration here
+//
+
+{% if bind9_masters|default() %}
+{%   for master in bind9_masters %}
+masters {{ master.name }} {
+{%     for addr in master.addresses %}
+    {{ addr }};
+{%     endfor %}
+};
+{%   endfor %}
+{% endif %}
+{% if bind9_masters_extra|default() %}
+{%   for master in bind9_masters_extra %}
+masters {{ master.name }} {
+{%     for addr in master.addresses %}
+    {{ addr }};
+{%     endfor %}
+};
+{%   endfor %}
+{% endif %}
+
+{% if bind9_statistics_enabled %}
+statistics-channels {
+  inet 127.0.0.1 port 8053 allow { 127.0.0.1; };
+};
+{% endif %}
+
+// The following zones are managed by this DNS Server //
+{% for zone in (bind9_zones_static + bind9_zones_dynamic)|sort(attribute='name') %}
+{% set zone_type = zone.type|default(bind9_zone_type|default('master')) %}
+zone "{{ zone.name }}" {
+    type {{ zone_type }};
+{%   if zone_type == 'master' %}
+    file "{{ bind9_zonedir }}/db.{{ zone.name }}";
+{%     if bind9_notify_explicit|default() %}
+    notify explicit;
+{%     elif zone.notify|default(true) %}
+    notify yes;
+{%     endif %}
+{%     if (bind9_dnssec|default() or zone.dnssec|default()) and zone.dnssec|default(bind9_dnssec_zones_default_enabled) %}
+{%       if zone.auto_dnssec|default() %}
+    auto-dnssec maintain;
+{%       else %}
+    dnssec-policy {{ zone.dnssec_policy|default('default') }};
+{%       endif %}
+    inline-signing yes;
+{%     endif %}
+{%     if zone.update_policy_grant|default() %}
+    update-policy {
+        grant {{ zone.name }}_ddns_update {{ zone.update_policy_grant }};
+    };
+{%     endif %}
+{%   elif zone_type == 'slave' %}
+    file "/var/lib/bind/db.{{ zone.name }}";
+{%     if zone.masters|default() or bind9_masters|default() %}
+    notify no;
+    masters {
+{%       if zone.masters|default() %}
+{%         for master in zone.masters %}
+        {{ master }};
+{%         endfor %}
+{%       elif bind9_masters|default() %}
+{%         for master in bind9_masters %}
+        {{ master.name }};
+{%         endfor %}
+{%       endif %}
+    };
+{%     endif %}
+{%   else %}
+{%      if zone_type == 'forward' %}
+    forwarders {
+{%         for fwd in zone.forwarders %}
+        {{ fwd }}; 
+{%         endfor %}
+   }; 
+{%     endif %}
+{%   endif %}
+};
+{% endfor %}

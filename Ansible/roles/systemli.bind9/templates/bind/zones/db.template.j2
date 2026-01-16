@@ -1,0 +1,74 @@
+{# Structure of a yaml dynamic zone variable:
+- name: example.org
+  serial: YYYYMMDDNN
+  admin: postmaster.example.org
+  ns_records:
+    - ns1.example.org.
+    - ns2.example.org.
+  a_records:
+    - 192.168.0.1
+  aaaa_records:
+    - fc00::
+  mx_records:
+    - priority: 10
+      name: mx1.example.org.
+  caa_records:
+    - 0 issue "example-ca.org"
+  rrs:
+    - label: subdomain
+      type: A|CNAME|...
+      rdata: IP|domain
+#}{% set zone=item %}
+;; {{ ansible_managed }}
+$ORIGIN .
+{# Default TTL of zone records. `negative_ttl` is a deprecated name of this variable.  #}
+$TTL {{ zone.default_ttl|default(zone.negative_ttl|default('3600')) }}   ; 1 hour.
+{# We first deal in detail with SOA and NS, which are requiered, and root zone registers
+   Empezamos detallando el SOA y NS, que son indispensables, y registros de raíz de zona #}
+{{ zone.name }} IN  SOA     {{ zone.primary|default(zone.ns_records.0) }}. {{ zone.admin|default(bind9_admin) }}. (
+                {{ zone.serial }} ; serial
+                {{ zone.refresh|default('14400') }} ; refresh (3 hours)
+                {{ zone.retry|default('3600') }} ; retry (1 hour)
+                {{ zone.expire|default('604800') }} ; expire (1 week)
+                {{ zone.minimum|default('10800') }} ; minimum (3 hours)
+                )
+{% for ns in zone.ns_records %}
+                    NS      {{ ns }}
+{% endfor %}
+{% if zone.a_records is defined %}
+{%   for a in zone.a_records %}
+                    A       {{ a }}
+{%   endfor %}
+{% endif %}
+{% if zone.aaaa_records is defined %}
+{%   for aaaa in zone.aaaa_records %}
+                    AAAA    {{ aaaa }}
+{%   endfor %}
+{% endif %}
+{% if zone.mx_records is defined %}
+{%   for mx in zone.mx_records %}
+                    MX      {{ mx.priority|default('10') }} {{ mx.name }}.
+{%   endfor %}
+{% endif %}
+{% if zone.txt_records is defined %}
+{%   for txt in zone.txt_records %}
+                    TXT     "{{ txt }}"
+{%   endfor %}
+{% endif %}
+{# CAA record is being used to specify a CA for this domain.
+   Only this CA can create certificates for the domain.
+   Also see: https://www.rfc-editor.org/rfc/rfc8659.html #}
+{% if zone.caa_records is defined %}
+{%   for caa in zone.caa_records %}
+                    CAA     {{ caa }}
+{%   endfor %}
+{% endif %}
+$ORIGIN {{ zone.name }}.
+
+{# Then a generic yaml following basic RR structure (omiting 'class'):
+   Seguimos con un yaml conforme a la estructura básica de un RR (omitiendo 'class'):
+   http://www.zytrax.com/books/dns/ch8/#generic #}
+
+{% for resource in zone.rrs %}
+{{ resource.label }} {{ resource.ttl|default() }} {{ resource.type }} {{ resource.rdata }}
+{% endfor %}

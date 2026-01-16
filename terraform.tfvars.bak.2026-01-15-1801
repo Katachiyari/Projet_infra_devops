@@ -1,0 +1,96 @@
+proxmox_api_token  = "terraform-jdk@pve4!jdk-token=c4a17231-fab8-4cd6-801e-bc0dd0251b1c"
+ssh_public_key     = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE30vg7EchnxPkkVvAnbi0Ey55NGWRiUNE1ClsUvCj7d vm-common-key"
+proxmox_endpoint   = "https://10.250.250.4:8006/"
+proxmox_host       = "10.250.250.4"
+node_name          = "pve4"
+template_vmid      = 9000
+datastore_vm       = "local-lvm"
+datastore_snippets = "jdk-snippets"
+gateway            = "172.16.100.1"
+disk_storage       = "local-lvm"
+dns_server         = "172.16.100.254"
+
+nodes = {
+  bind9dns = {
+    ip     = "172.16.100.254"
+    cpu    = 2
+    mem    = 1024
+    disk   = 20
+    bridge = "vmbr23"
+    tags   = ["JDK", "DNS", "prod", "bind9"]
+  }
+  git-lab = {
+    ip     = "172.16.100.40" # 95?
+    cpu    = 4
+    mem    = 8192
+    disk   = 30
+    bridge = "vmbr23"
+    tags   = ["JDK", "gitlab", "prod"]
+  }
+  harbor = {
+    ip     = "172.16.100.50" # 96?
+    cpu    = 2
+    mem    = 4096
+    disk   = 50
+    bridge = "vmbr23"
+    tags   = ["JDK", "registry", "prod"]
+  }
+  k3s-manager = {
+    ip     = "172.16.100.250" # 254?
+    cpu    = 4
+    mem    = 8192
+    disk   = 60
+    bridge = "vmbr23"
+    tags   = ["JDK", "k3s", "manager"]
+  }
+  k3s-worker-0 = {
+    ip     = "172.16.100.251" # 251?
+    cpu    = 2
+    mem    = 4096
+    disk   = 40
+    bridge = "vmbr23"
+    tags   = ["JDK", "k3s", "worker"]
+  }
+  k3s-worker-1 = {
+    ip     = "172.16.100.252"
+    cpu    = 2
+    mem    = 4096
+    disk   = 40
+    bridge = "vmbr23"
+    tags   = ["JDK", "k3s", "worker"]
+  }
+  reverse-proxy = {
+    ip     = "172.16.100.253"
+    cpu    = 2
+    mem    = 4096
+    disk   = 20
+    bridge = "vmbr23"
+    tags   = ["JDK", "reverse-proxy", "nginx"]
+  }
+  tools-manager = {
+    ip     = "172.16.100.20"
+    cpu    = 2
+    mem    = 4096
+    disk   = 60
+    bridge = "vmbr23"
+    tags   = ["JDK", "tools", "ansible"]
+  }
+}
+net_bridge = "vmbr23"
+# --- Vars legacy (car ton variables.tf les demande) ---
+pm_host         = "10.250.250.4"
+pm_token_id     = "terraform-jdk@pve4!jdk-token"
+pm_token_secret = "c4a17231-fab8-4cd6-801e-bc0dd0251b1c"
+
+proxmox_node = "pve4"
+template_id  = 9000
+vmid_start   = 6000
+
+vm_definitions = {
+  dummy = {
+    cores  = 1
+    memory = 1024
+    disk   = 10
+    ip     = "172.16.100.200"
+  }
+}

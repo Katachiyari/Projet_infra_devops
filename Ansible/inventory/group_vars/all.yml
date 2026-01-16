@@ -1,0 +1,13 @@
+---
+# Permet de gérer le cas "je dois SSH 2 fois" (machine locale -> bastion -> réseau privé).
+# Par défaut on désactive: si tu lances Ansible *depuis* le bastion, ou si le bastion est injoignable,
+# forcer ProxyJump rend tout unreachable.
+# Active via: -e bastion_enabled=true
+bastion_enabled: false
+
+# Bastion que tu utilises quand tu fais: ssh admin1@management-jdk
+bastion_host: "172.16.100.100"
+bastion_user: "admin1"
+
+# Si bastion_enabled=true, Ansible utilisera automatiquement ProxyJump pour joindre les hôtes privés.
+ansible_ssh_common_args: "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}"

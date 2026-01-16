@@ -1,0 +1,4 @@
+---
+roles:
+  - name: systemli.bind9
+    version: "1.7.4"

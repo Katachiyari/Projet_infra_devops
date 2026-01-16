@@ -1,0 +1,28 @@
+#cloud-config
+hostname: ${hostname}
+manage_etc_hosts: true
+ 
+users:
+  - default
+  - name: ansible
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    ssh_authorized_keys:
+      - ${ansible_pubkey}
+ 
+ 
+packages:
+  - qemu-guest-agent
+  - sudo
+ 
+write_files:
+  - path: /etc/ssh/sshd_config.d/99-ansible-hardening.conf
+    permissions: "0644"
+    content: |
+      PasswordAuthentication no
+      PubkeyAuthentication yes
+ 
+runcmd:
+  - [ systemctl, enable, --now, qemu-guest-agent ]
+  - [ systemctl, restart, ssh ]

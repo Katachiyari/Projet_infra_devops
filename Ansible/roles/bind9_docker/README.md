@@ -1,7 +1,10 @@
-Role Name
-=========
+bind9_docker (déprécié)
+======================
 
-A brief description of the role goes here.
+Ce rôle était un squelette (créé via `ansible-galaxy init`) et n'était pas implémenté.
+
+Dans ce projet, le déploiement Bind9 utilise le rôle maintenu `systemli.bind9` via le playbook
+`playbooks/bind9-docker.yml` (mal nommé historiquement).
 
 Requirements
 ------------

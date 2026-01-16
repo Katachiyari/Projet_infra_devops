@@ -1,19 +1,19 @@
-proxmox_endpoint  = "https://10.250.250.4:8006/"
-proxmox_api_token = "terraform-jdk@pve4!jdk-token=c4a17231-fab8-4cd6-801e-bc0dd0251b1c"
+proxmox_endpoint  = "https://<proxmox-ip>:8006/"
+proxmox_api_token = "<user@realm!token=SECRET>"
 proxmox_insecure  = true
 
-node_name     = "pve4"
+node_name     = "pveX"
 template_vmid = 9000
 
 datastore_vm       = "local-lvm"
-datastore_snippets = "jdk_snippets"
+datastore_snippets = "<snippets-datastore>"
 
 gateway     = "172.16.100.1"
 cidr_suffix = 24
 
 ssh_username   = "root"
 ssh_agent      = true
-ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE30vg7EchnxPkkVvAnbi0Ey55NGWRiUNE1ClsUvCj7d vm-common-key"
+ssh_public_key = "ssh-ed25519 AAAA... your-key"
 
 nodes = {
   bind9dns = {

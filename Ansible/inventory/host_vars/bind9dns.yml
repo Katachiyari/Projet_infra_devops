@@ -1,9 +1,24 @@
 ---
-ansible_ssh_private_key_file: ~/.ssh/id_ed25519_common
-bind9_domain: "jdk.lab"
-bind9_forwarders:
+# Recursor + forwarders
+bind9_recursor: true
+bind9_forward: true
+bind9_forward_servers:
   - "1.1.1.1"
   - "9.9.9.9"
-bind9_trusted_nets:
+
+# Réseaux autorisés à résoudre via ce DNS
+bind9_our_networks:
   - "172.16.100.0/24"
-bind9_ns_name: "ns1.jdk.lab"
+  - localhost
+
+# Zone interne (exemple dynamique)
+bind9_authoritative: true
+bind9_zones_dynamic:
+  - name: "jdk.lab"
+    type: master
+    serial: 2026011601
+    admin: "postmaster.jdk.lab"
+    ns_records:
+      - "ns1.jdk.lab"
+    rrs:
+      - { label: "ns1", type: "A", rdata: "172.16.100.254" }

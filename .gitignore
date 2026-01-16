@@ -1,0 +1,25 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# tfvars contain secrets
+terraform.tfvars
+*.tfvars
+*.tfvars.json
+
+# Backups / editor
+*.bak
+*.BACKUP.*
+*~
+
+# Ansible generated inventory
+Ansible/inventory/terraform.generated.yml
+
+# Ansible facts/cache
+*.retry
+
+# OS
+.DS_Store

@@ -1,6 +1,6 @@
 ---
-- name: Bind9 Docker
+- name: Bind9 (systemli.bind9)
   hosts: bind9dns
   become: true
   roles:
-    - bind9_docker
+    - systemli.bind9

@@ -1,0 +1,22 @@
+# Projet Infra (Terraform + Ansible + cloud-init)
+
+## Objectif
+- **Terraform** crée les VMs sur Proxmox et injecte l’accès SSH (utilisateur `ansible` + clé publique).
+- **cloud-init** fait le bootstrap OS (qemu-guest-agent, durcissement SSH, sudoers).
+- **Ansible** configure les services (Taiga, Bind9, …) de façon idempotente.
+
+## Connexion 100% automatisée (principe)
+1. **Une seule source de vérité pour l’accès SSH** : la clé publique est fournie à Terraform (`ssh_public_key`).
+2. Terraform configure l’utilisateur `ansible` et sa clé via `initialization.user_account`.
+3. cloud-init s’occupe du système (packages + sshd + sudoers), sans re-définir l’utilisateur.
+4. Terraform génère automatiquement l’inventaire Ansible dans `Ansible/inventory/terraform.generated.yml`.
+
+## Fichiers sensibles
+- Ne versionne pas les secrets : `terraform.tfvars` et les fichiers `*.tfvars` sont ignorés par Git.
+- Ne versionne pas le state : `*.tfstate*` est ignoré (utilise idéalement un backend distant).
+
+## Démarrage (référence)
+1. Crée un fichier `terraform.tfvars` (non versionné) à partir de `terraform.tfvars.example`.
+2. `terraform init`
+3. `terraform apply`
+4. Dans `Ansible/` : `./bootstrap.sh` puis `./run-taiga-apply.sh` (ou `--bastion`).

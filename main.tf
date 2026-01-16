@@ -2,8 +2,7 @@ locals {
   cloud_init_user_data = {
     for name, n in var.nodes :
     name => templatefile("${path.module}/cloud-init/user-data.yaml.tftpl", {
-      hostname       = name
-      ansible_pubkey = var.ssh_public_key
+      hostname = name
     })
   }
 }

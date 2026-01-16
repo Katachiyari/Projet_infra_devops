@@ -1,21 +1,19 @@
 #cloud-config
-hostname: {{ hostname }}
+hostname: ${hostname}
 manage_etc_hosts: true
 
-users:
-  - default
-  - name: ansible
-    groups: [sudo]
-    shell: /bin/bash
-    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
-    ssh_authorized_keys:
-      - "{{ ansible_pubkey | trim }}" 
+package_update: true
 
 packages:
   - qemu-guest-agent
   - sudo
 
 write_files:
+  - path: /etc/sudoers.d/90-ansible-nopasswd
+    permissions: "0440"
+    content: |
+      ansible ALL=(ALL) NOPASSWD:ALL
+
   - path: /etc/ssh/sshd_config.d/99-ansible-hardening.conf
     permissions: "0644"
     content: |

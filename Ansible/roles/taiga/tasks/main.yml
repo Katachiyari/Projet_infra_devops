@@ -26,7 +26,7 @@
 
 - name: Ajouter le repo officiel Docker (Debian)
   ansible.builtin.apt_repository:
-    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
     state: present
     filename: docker
   tags: [docker]
@@ -46,7 +46,7 @@
 # --- Taiga (tag taiga) ---
 - name: Reset taiga (optionnel)
   ansible.builtin.file:
-    path: /opt/taiga
+    path: "{{ taiga_install_dir }}"
     state: absent
   tags: [taiga_reset]
 
@@ -56,31 +56,34 @@
     state: directory
     mode: "0755"
   loop:
-    - /opt/taiga
-    - /opt/taiga/src
-    - /opt/taiga/config
+    - "{{ taiga_install_dir }}"
+    - "{{ taiga_install_dir }}/src"
+    - "{{ taiga_install_dir }}/config"
   tags: [taiga]
 
 - name: Cloner taiga-docker
   ansible.builtin.git:
-    repo: "https://github.com/taigaio/taiga-docker.git"
-    dest: /opt/taiga/src
-    version: stable
+    repo: "{{ taiga_repo }}"
+    dest: "{{ taiga_install_dir }}/src"
+    version: "{{ taiga_repo_version }}"
     update: true
   tags: [taiga]
 
 - name: Déployer .env (hors repo git)
   ansible.builtin.template:
     src: "{{ role_path }}/templates/taiga.env.j2"
-    dest: /opt/taiga/config/.env
+    dest: "{{ taiga_install_dir }}/config/.env"
     owner: root
     group: root
     mode: "0600"
   no_log: true
   tags: [taiga]
 
-- name: Up Taiga (compose avec env-file)
-  ansible.builtin.command: docker compose --env-file /opt/taiga/config/.env up -d
-  args:
-    chdir: /opt/taiga/src
+- name: Up Taiga (compose idempotent)
+  community.docker.docker_compose_v2:
+    project_src: "{{ taiga_install_dir }}/src"
+    env_files:
+      - "{{ taiga_install_dir }}/config/.env"
+    state: present
+    pull: missing
   tags: [taiga]

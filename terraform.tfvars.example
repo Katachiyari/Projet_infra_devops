@@ -1,0 +1,44 @@
+# Exemple (NE PAS COMMIT) — copie vers terraform.tfvars
+
+proxmox_endpoint  = "https://<proxmox-ip>:8006/"
+proxmox_api_token = "<user@realm!token=SECRET>"
+proxmox_insecure  = true
+
+node_name     = "pveX"
+template_vmid = 9000
+
+datastore_vm       = "local-lvm"
+datastore_snippets = "<snippets-datastore>"
+
+gateway     = "172.16.100.1"
+cidr_suffix = 24
+
+ssh_username   = "root"
+ssh_agent      = true
+ssh_public_key = "ssh-ed25519 AAAA... your-key"
+
+# Exemple de mapping tag -> groupe Ansible (optionnel)
+ansible_group_by_tag = {
+  tools = "taiga_hosts"
+}
+
+# Exemple de nodes
+nodes = {
+  tools-manager = {
+    ip     = "172.16.100.20"
+    cpu    = 2
+    mem    = 4096
+    disk   = 60
+    bridge = "vmbr23"
+    tags   = ["tools", "ansible", "dev"]
+  }
+
+  bind9dns = {
+    ip     = "172.16.100.254"
+    cpu    = 2
+    mem    = 1024
+    disk   = 20
+    bridge = "vmbr23"
+    tags   = ["DNS", "prod", "bind9"]
+  }
+}

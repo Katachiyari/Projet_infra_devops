@@ -23,7 +23,7 @@ resource "proxmox_virtual_environment_vm" "vm" {
   for_each  = var.nodes
   name      = each.key
   node_name = var.node_name
-  tags      = each.value.tags
+  tags      = sort(distinct([for t in each.value.tags : lower(t)]))
 
   clone {
     vm_id = var.template_vmid
@@ -66,6 +66,14 @@ resource "proxmox_virtual_environment_vm" "vm" {
 
     # attache ton cloud-config (installe qemu-guest-agent + hardening)
     user_data_file_id = proxmox_virtual_environment_file.user_data[each.key].id
+  }
+
+  lifecycle {
+    # Le provider remplace le resource file snippet quand son contenu change.
+    # On évite que ça force le remplacement de la VM.
+    ignore_changes = [
+      initialization[0].user_data_file_id,
+    ]
   }
 
   agent {

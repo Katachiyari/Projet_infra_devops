@@ -3,6 +3,10 @@
   hosts: all
   gather_facts: false
   tasks:
+    - name: Attendre que SSH soit prêt
+      ansible.builtin.wait_for_connection:
+        timeout: 120
+
     - name: Ping connectivity
       ansible.builtin.ping:
       register: ping_result

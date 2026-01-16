@@ -23,3 +23,9 @@
 5. Dans `Ansible/` : `./bootstrap.sh` puis `./run-taiga-apply.sh` (ou `--bastion`).
 
 Astuce: tu peux aussi faire `terraform plan -var-file=terraform.tfvars -input=false`.
+
+## Vérifier la connectivité Ansible (ping/pong)
+Dans `Ansible/`:
+- `./run-ping-test.sh` (réseau direct)
+- `./run-ping-test.sh --bastion` (via ProxyJump)
+- `./run-ping-test.sh --key ~/.ssh/id_ed25519_common`

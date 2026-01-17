@@ -1,71 +1,93 @@
-# 🚀 Projet Infra DevSecOps – Proxmox · Terraform · Ansible
+# 🚀 Projet DevSecOps Lab – Plateforme Automatisée & Sécurisée
 
 ![status](https://img.shields.io/badge/status-en%20cours-brightgreen)
 ![stack](https://img.shields.io/badge/stack-DevSecOps-blueviolet)
 ![infra](https://img.shields.io/badge/infra-Proxmox%209.1.1-orange)
 ![automation](https://img.shields.io/badge/automation-100%25%20IaC-success)
+![security](https://img.shields.io/badge/security-Shift--Left%20Trivy%20UFW-critical)
+![ssot](https://img.shields.io/badge/SSOT-Single%20Source%20of%20Truth-informational)
 
-> Esprit startup, infra codée, sécurisée et reproductible. Toute la plateforme est pensée **HTTP backend / HTTPS frontend** avec une **PKI locale** et un **reverse-proxy Nginx** comme porte d’entrée unique.
-
----
-
-## 🧩 Vision globale
-
-Ce dépôt décrit une stack DevSecOps complète sur Proxmox :
-
-- **Terraform** : crée les VMs, configure réseau & SSH (utilisateur `ansible` + clé publique).
-- **cloud-init** : bootstrap unique des OS (qemu-guest-agent, durcissement SSH, sudoers).
-- **Ansible** : déploie les services applicatifs de façon **idempotente** (DNS, PKI, reverse-proxy, Harbor/Portainer, monitoring, …).
-- **Docker / Docker Compose** : exécution des services.
-- **Trivy** : scan systématique des images (CRITICAL/HIGH = ❌).
-
-Le tout est structuré autour d’un principe fort : **SSOT (Single Source of Truth)**. Une seule source pour chaque vérité (clé SSH, IPs, DNS, certificats…), tout le reste est dérivé automatiquement.
+> Plateforme DevSecOps automatisée, pensée “startup” : HTTP backend, HTTPS frontend, PKI locale, sécurité by design, tout est piloté par le code.
 
 ---
 
-## 🏗️ Architecture actuelle (missions réalisées)
+## 🧩 Stack technique & principes clés
 
-Architecture réseau : `172.16.100.0/24` – domaine : `lab.local`.
+- **Proxmox 9.1.1** : Hyperviseur de virtualisation, snapshots, gestion VM cloud-init
+- **Terraform** : Provisionnement VMs, réseau, SSH (IaC, SSOT)
+- **cloud-init** : Bootstrap OS (durcissement, user ansible, sudoers, qemu-guest-agent)
+- **Ansible** : Déploiement idempotent (PKI, DNS, reverse-proxy, Harbor, Portainer, monitoring…)
+- **Docker/Compose** : Exécution des services applicatifs
+- **Trivy** : Scan vulnérabilités (fail si CRITICAL/HIGH, shift-left security)
+- **UFW** : Firewall restrictif sur chaque VM, accès minimal
+- **Bind9** : DNS interne, zones dynamiques, SSOT des noms
+- **PKI locale** : CA root, wildcard *.lab.local, trust distribué
+- **Logs & observabilité** : Nginx JSON, Prometheus, Grafana, Alertmanager
 
-### ✅ Mission 0 – PKI CA locale
+**Philosophie** :
+- 100% Infrastructure as Code (IaC)
+- Single Source of Truth (SSOT) pour chaque donnée critique (clé SSH, IP, DNS, certs)
+- Sécurité by design (TLS, UFW, Trivy, permissions, CI/CD ready)
+- Documentation et validation automatisées
 
-- Rôle : `Ansible/roles/pki_ca/`.
-- Génération de la **Lab Root CA** (`root-ca.crt/key`) et du certificat wildcard `*.lab.local`.
-- Installation de la CA dans le trust système des VMs.
-- Tous les certificats serveurs (Nginx) sont émis par cette CA.
+---
 
-👉 Détails : PKI et flux TLS documentés dans [Docs/stackGlobal/SSOT-DevSecOps-stack.md](Docs/stackGlobal/SSOT-DevSecOps-stack.md).
+## 🏗️ Architecture réseau & flux (SSOT)
 
-### ✅ Mission 1 – Reverse-proxy Nginx (172.16.100.253)
+```
+Internet/Client
+   │  HTTPS (TLS 1.2/1.3)
+   ▼
+┌──────────────────────────────┐
+│ Nginx Reverse Proxy          │ 172.16.100.253
+│ - TLS *.lab.local            │
+│ - Headers sécurité, logs     │
+│ - Redirection HTTP→HTTPS     │
+└──────────────────────────────┘
+   │  HTTP interne (backend)
+   ▼
+┌────────────────────────────────────────────────────────────┐
+│ Harbor  | 172.16.100.50:80                                 │
+│ Portainer | 172.16.100.50:9000                             │
+│ Monitoring | 172.16.100.60:9090/3000/9093                  │
+│ (GitLab, Taiga, EdgeDoc à venir)                           │
+└────────────────────────────────────────────────────────────┘
+```
 
-- Rôle : `Ansible/roles/nginx_reverse_proxy/`.
-- Nginx en conteneur (`nginx:1.25-alpine`) avec :
-	- Terminaison TLS pour `*.lab.local` (certificat wildcard).
-	- Redirection **HTTP → HTTPS**.
-	- En-têtes de sécurité (HSTS, X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy…).
-	- Rate-limiting et logs JSON.
-- Upstreams HTTP vers les backends : Harbor, Portainer, (futur GitLab, Taiga, EdgeDoc…).
+- **DNS Bind9** : lab.local → reverse-proxy (entrée unique, zones dynamiques)
+- **PKI locale** : CA root + wildcard *.lab.local (10 ans, stockage /opt/ca, trust distribué)
+- **Sécurité** : UFW restrictif, Trivy, headers, rate-limiting, logs JSON, monitoring Prometheus
 
-### ✅ Mission 2 – Harbor + Portainer (172.16.100.50)
+---
 
-- Rôles : `Ansible/roles/harbor/` et `Ansible/roles/portainer/`.
-- **Harbor** (registre d’images, HTTP interne) :
-	- Exposé en HTTP sur `172.16.100.50:80`.
-	- `external_url` = `https://harbor.lab.local` (via Nginx).
-- **Portainer CE** (UI Docker, HTTP interne) :
-	- Exposé en HTTP sur `172.16.100.50:9000`.
-- **Sécurité** :
-	- UFW sur la VM autorise 80/9000 **uniquement** depuis `172.16.100.253` (reverse-proxy).
-	- Trivy intégré dans les rôles pour scanner les images clés.
+## ✅ Missions réalisées (détail)
 
-### ✅ Stack monitoring (172.16.100.60)
+### 0️⃣ PKI CA locale
+- Rôle : `Ansible/roles/pki_ca/`
+- Génération CA root (4096b, 10 ans), wildcard *.lab.local (825j), stockage sécurisé
+- Distribution CA sur toutes VMs (`/usr/local/share/ca-certificates/`)
+- Certificats serveurs pour Nginx, validés par la CA
+- Scripts de renouvellement, tests automatisés (Ansible)
 
-- Rôle : `Ansible/roles/monitoring/`.
-- VM `monitoring-stack` avec :
-	- **Prometheus** : `http://prometheus.lab.local:9090/`.
-	- **Grafana** : `http://grafana.lab.local:3000/`.
-	- **Alertmanager** : `http://alertmanager.lab.local:9093/`.
-- **Node Exporter** déployé sur les VMs pour exposer les métriques système.
+### 1️⃣ Nginx reverse-proxy (172.16.100.253)
+- Rôle : `Ansible/roles/nginx_reverse_proxy/`
+- Nginx Docker (`nginx:1.25-alpine`), TLS termination, redirection HTTP→HTTPS
+- Upstreams HTTP vers Harbor, Portainer, (GitLab, Taiga, EdgeDoc à venir)
+- Headers sécurité (HSTS, X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy)
+- Rate-limiting, logs JSON, monitoring Prometheus, health endpoint
+
+### 2️⃣ Harbor + Portainer (172.16.100.50)
+- Rôles : `Ansible/roles/harbor/`, `Ansible/roles/portainer/`
+- Harbor (registre images, HTTP interne, external_url HTTPS)
+- Portainer CE (UI Docker, HTTP interne)
+- UFW : ports 80/9000 accessibles **uniquement** depuis le reverse-proxy
+- Trivy intégré (scan images, fail si vulnérabilités critiques)
+
+### 3️⃣ Monitoring (172.16.100.60)
+- Rôle : `Ansible/roles/monitoring/`
+- Prometheus, Grafana, Alertmanager (Docker Compose)
+- Node Exporter sur chaque VM (systemd)
+- Dashboards, alertes, health-checks
 
 ---
 
@@ -73,108 +95,112 @@ Architecture réseau : `172.16.100.0/24` – domaine : `lab.local`.
 
 Exemple : `https://harbor.lab.local/` → Harbor.
 
-1. **DNS Bind9** renvoie `harbor.lab.local` → `172.16.100.253` (reverse-proxy).
-2. Le navigateur se connecte en **HTTPS** à Nginx qui présente le wildcard `*.lab.local` (signé par la Lab Root CA).
-3. Nginx proxifie en **HTTP** vers `172.16.100.50:80` (Harbor backend).
-4. La réponse revient chiffrée vers le client.
+1. **DNS Bind9** : `harbor.lab.local` → `172.16.100.253` (reverse-proxy)
+2. **TLS** : Nginx présente le wildcard `*.lab.local` (CA locale)
+3. **Proxy** : Nginx → HTTP → `172.16.100.50:80` (Harbor)
+4. **Sécurité** : headers, logs, monitoring
 
-Même logique pour `https://portainer.lab.local/` → `172.16.100.50:9000`.
+Même logique pour Portainer, GitLab, Taiga, EdgeDoc…
 
-👉 La doc détaillée (DNS, flux, troubleshooting) est dans [Docs/stackGlobal/SSOT-DevSecOps-stack.md](Docs/stackGlobal/SSOT-DevSecOps-stack.md).
-
----
-
-## ⚙️ Pipeline IaC de bout en bout
-
-### 🔐 Connexion 100% automatisée
-
-1. **SSOT clé SSH** : `keys/…ed25519.pub` référencée dans `terraform.tfvars` (`ssh_public_key`).
-2. **Terraform** crée les VMs Proxmox et pousse la clé via `initialization.user_account`.
-3. **cloud-init** fait le bootstrap (packages, sshd, sudoers) sans recréer l’utilisateur.
-4. **Terraform** génère l’inventaire Ansible : `Ansible/inventory/terraform.generated.yml`.
-
-### 🧾 Fichiers sensibles
-
-- Secrets non versionnés : `terraform.tfvars`, autres `*.tfvars`.
-- State non versionné : `*.tfstate*` (idéalement backend distant).
-
-### 🚀 Démarrage (happy path)
-
-1. Copier `terraform.tfvars.example` → `terraform.tfvars` et adapter.
-2. `terraform init`
-3. `terraform plan -input=false`
-4. `terraform apply -input=false`
-5. Dans `Ansible/` :
-	 - `./bootstrap.sh`
-	 - `./run-ping-test.sh` (ou `--bastion` selon ton contexte)
-	 - Playbooks applicatifs (PKI, reverse-proxy, Harbor/Portainer, monitoring…).
-
-Astuce : `terraform plan -var-file=terraform.tfvars -input=false` pour forcer le var-file.
-
----
-
-## 📚 Documentation SSOT
-
-- Vue d’ensemble DevSecOps (PKI, Nginx, Harbor/Portainer, monitoring, DNS, flux) :
-	- [Docs/stackGlobal/SSOT-DevSecOps-stack.md](Docs/stackGlobal/SSOT-DevSecOps-stack.md)
-- DNS / Bind9 :
-	- [Docs/bind9/bind9.md](Docs/bind9/bind9.md)
-- Monitoring stack :
-	- [Docs/stackMonitoring/stackMonitoring.md](Docs/stackMonitoring/stackMonitoring.md)
-- GitLab (design & contraintes, en amont de la Mission 3) :
-	- [Docs/gitLab/gitLab.md](Docs/gitLab/gitLab.md)
+👉 Voir [Docs/stackGlobal/SSOT-DevSecOps-stack.md](Docs/stackGlobal/SSOT-DevSecOps-stack.md) pour tous les flux, troubleshooting, et validation.
 
 ---
 
 ## 🌐 URLs principales (stack déjà livrée)
 
-Une fois la stack déployée **et la CA importée dans le navigateur** :
+> ⚠️ Importe la CA root dans ton navigateur pour éviter les alertes TLS.
 
-- 🔐 Harbor : `https://harbor.lab.local/`
-- 🧭 Portainer : `https://portainer.lab.local/`
-- 📈 Prometheus : `http://prometheus.lab.local:9090/`
-- 📊 Grafana : `http://grafana.lab.local:3000/`
-- 🚨 Alertmanager : `http://alertmanager.lab.local:9093/`
+- 🔐 [https://harbor.lab.local/](https://harbor.lab.local/)
+- 🧭 [https://portainer.lab.local/](https://portainer.lab.local/)
+- 📈 [http://prometheus.lab.local:9090/](http://prometheus.lab.local:9090/)
+- 📊 [http://grafana.lab.local:3000/](http://grafana.lab.local:3000/)
+- 🚨 [http://alertmanager.lab.local:9093/](http://alertmanager.lab.local:9093/)
 
 ---
 
-## 🔮 Roadmap – Missions à venir (ia.txt)
+## 🚀 Pipeline IaC & bonnes pratiques
+
+### 🔐 Connexion 100% automatisée
+- Clé SSH unique (SSOT) injectée via Terraform → cloud-init → Ansible
+- Inventaire dynamique généré par Terraform, consommé par Ansible
+- Secrets & state jamais versionnés (`.gitignore`)
+- Playbooks idempotents, validés, tests intégrés
+
+### 🧾 Démarrage (happy path)
+1. Copier `terraform.tfvars.example` → `terraform.tfvars` et adapter
+2. `terraform init`
+3. `terraform plan -input=false`
+4. `terraform apply -input=false`
+5. Dans `Ansible/` :
+   - `./bootstrap.sh`
+   - `./run-ping-test.sh` (ou `--bastion`)
+   - Playbooks applicatifs (PKI, reverse-proxy, Harbor/Portainer, monitoring…)
+
+### 🧑‍💻 Structure des rôles Ansible (exemple)
+```
+roles/<app>/
+├── defaults/main.yml
+├── tasks/main.yml
+├── tasks/prerequisites.yml
+├── tasks/install.yml
+├── tasks/configure.yml
+├── tasks/deploy.yml
+├── tasks/security.yml
+├── tasks/validation.yml
+├── templates/
+├── handlers/main.yml
+├── meta/main.yml
+```
+
+### 🔒 Sécurité DevSecOps (shift-left)
+- Trivy scan images Docker (fail si CRITICAL/HIGH)
+- UFW restrictif (ports ouverts uniquement au strict nécessaire)
+- Permissions fichiers sensibles (0600, root)
+- Headers sécurité Nginx
+- SAST/Bandit/Semgrep sur scripts
+
+### 📚 Documentation SSOT
+- Vue d’ensemble : [Docs/stackGlobal/SSOT-DevSecOps-stack.md](Docs/stackGlobal/SSOT-DevSecOps-stack.md)
+- DNS / Bind9 : [Docs/bind9/bind9.md](Docs/bind9/bind9.md)
+- Monitoring : [Docs/stackMonitoring/stackMonitoring.md](Docs/stackMonitoring/stackMonitoring.md)
+- GitLab (design & contraintes) : [Docs/gitLab/gitLab.md](Docs/gitLab/gitLab.md)
+
+---
+
+## 🔮 Roadmap (prochaines missions)
 
 > Les prochaines étapes sont déjà spécifiées dans [ia.txt](ia.txt). La stack actuelle a été pensée pour les accueillir **sans refonte**.
 
 ### 🚧 Mission 3 – GitLab (à venir)
-
 - VM dédiée (GitLab) avec services HTTP :
-	- GitLab web : `172.16.100.40:80`.
-	- Registry : `172.16.100.40:5050`.
+  - GitLab web : `172.16.100.40:80`
+  - Registry : `172.16.100.40:5050`
 - Reverse-proxy Nginx en frontal :
-	- `https://gitlab.lab.local/` → backend HTTP GitLab.
-	- `https://registry.gitlab.lab.local/` → backend HTTP registry.
-- Intégration GitLab Runner, CI/CD, registry Docker.
+  - `https://gitlab.lab.local/` → backend HTTP GitLab
+  - `https://registry.gitlab.lab.local/` → backend HTTP registry
+- Intégration GitLab Runner, CI/CD, registry Docker
 
 ### 🚧 Mission 4 – Taiga + EdgeDoc (à venir)
-
 - VM applicative partagée (ou dédiée selon design final) :
-	- Taiga (gestion de projet agile) en HTTP (port 80).
-	- EdgeDoc (docs collaboratives) en HTTP (port 8080).
+  - Taiga (gestion de projet agile) en HTTP (port 80)
+  - EdgeDoc (docs collaboratives) en HTTP (port 8080)
 - Exposition via reverse-proxy :
-	- `https://taiga.lab.local/`.
-	- `https://edgedoc.lab.local/`.
+  - `https://taiga.lab.local/`
+  - `https://edgedoc.lab.local/`
 
-Les mêmes patterns s’appliquent : **HTTP interne, HTTPS externe, PKI locale, Trivy, UFW restrictif, Ansible idempotent**.
+**Pattern** : Toujours HTTP interne, HTTPS externe, PKI locale, UFW, Trivy, Ansible idempotent
 
 ---
 
-## 🤝 Contribuer / Faire évoluer la stack
+## 🤝 Contribution & extension
 
-- Ajouter une nouvelle appli = ajouter **une mission** :
-	- Rôle Ansible dédié (`roles/<app>/`).
-	- Backends HTTP sécurisés via UFW.
-	- Entrée Nginx dans le reverse-proxy.
-	- Entrées DNS Bind9 cohérentes.
-- Garder la logique SSOT :
-	- Terraform pour l’infra & inventaire.
-	- Ansible pour la configuration.
-	- Docs sous `Docs/` comme vérité fonctionnelle.
+- Ajouter une app = nouveau rôle Ansible, entrée Nginx, règle UFW, entrée DNS, doc SSOT
+- Respecter la logique SSOT, la sécurité, l’automatisation et la traçabilité
 
-Cette base est prête pour des features plus « startup » : CI/CD GitLab, intégration Harbor, scans Trivy en pipeline, dashboards Grafana pour l’observabilité, etc. Let’s build on top 🚀
+---
+
+Ce README est la vitrine et la boussole du projet : tout y est pour comprendre, déployer, valider, et faire évoluer la stack DevSecOps.
+
+---
+
+

@@ -26,6 +26,9 @@ Bienvenue dans la documentation détaillée du projet **Terraform + Proxmox + cl
 6. [06-modes-d-acces-a-proxmox.md](06-modes-d-acces-a-proxmox.md)  
    👉 Accès à Proxmox : interface web, API, SSH, et bonnes pratiques de sécurité.
 
+7. [monitoring-stack.md](monitoring-stack.md)  
+   👉 Déploiement complet de la stack monitoring (Prometheus, Grafana, Alertmanager, Node Exporter) et intégration DNS.
+
 ---
 
 Pour une vue d'ensemble rapide du projet, tu peux aussi consulter :

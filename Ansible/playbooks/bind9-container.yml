@@ -1,0 +1,6 @@
+---
+- name: Déployer Bind9 en conteneur Docker
+  hosts: bind9_hosts
+  become: true
+  roles:
+    - bind9_docker

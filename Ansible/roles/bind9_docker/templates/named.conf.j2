@@ -1,0 +1,42 @@
+// BIND9 config générée par le rôle bind9_docker
+
+options {
+    directory "/var/cache/bind";
+
+    // Récursion et ACL
+    recursion {{ 'yes' if bind9_recursor else 'no' }};
+    allow-query { {{ bind9_our_networks | join('; ') }}; };
+    allow-recursion { {{ bind9_our_networks | join('; ') }}; };
+
+    // Forwarders en option
+{% if bind9_forward and bind9_forward_servers | length %}
+    forwarders {
+{%   for fwd in bind9_forward_servers %}
+        {{ fwd }};
+{%   endfor %}
+    };
+{% endif %}
+
+    dnssec-validation auto;
+
+    listen-on port {{ bind9_port }} { {{ bind9_listen_v4 | join('; ') }}; };
+{% if bind9_listen_v6 | length %}
+    listen-on-v6 port {{ bind9_port }} { {{ bind9_listen_v6 | join('; ') }}; };
+{% else %}
+    listen-on-v6 { none; };
+{% endif %}
+
+    allow-transfer { none; };
+};
+
+// Zones dynamiques éventuelles
+{% if bind9_authoritative and bind9_zones_dynamic | length %}
+{%   for zone in bind9_zones_dynamic %}
+zone "{{ zone.name }}" IN {
+    type master;
+    file "/etc/bind/db.{{ zone.name }}";
+};
+
+{%   endfor %}
+{% endif %}
+

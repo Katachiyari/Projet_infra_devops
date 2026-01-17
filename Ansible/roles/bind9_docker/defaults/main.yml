@@ -1,3 +1,51 @@
-#SPDX-License-Identifier: MIT-0
 ---
 # defaults file for bind9_docker
+
+# Image Docker officielle Bind9 (priorité ISC, sinon Ubuntu)
+bind9_docker_image: "internetsystemsconsortium/bind9"
+bind9_docker_tag: "9.18"
+
+# Nom du conteneur
+bind9_docker_container_name: "bind9"
+
+# Répertoires de persistance côté hôte
+bind9_docker_config_dir: "/srv/bind9/etc"
+bind9_docker_cache_dir: "/srv/bind9/cache"
+
+# Port DNS
+bind9_port: 53
+
+# Adresse(s) d'écoute v4/v6 à l'intérieur du conteneur
+bind9_listen_v4:
+	- "172.16.100.254"
+bind9_listen_v6: []
+
+# Comportement récursif / forwarders (surchargés via host_vars)
+bind9_recursor: true
+bind9_forward: true
+bind9_forward_servers:
+	- "8.8.8.8"
+	- "1.1.1.1"
+
+# Réseaux autorisés à interroger ce DNS
+bind9_our_networks:
+	- "172.16.0.0/16"
+	- "127.0.0.1"
+
+# Zones internes dynamiques (surchargées dans host_vars)
+bind9_authoritative: false
+bind9_zones_dynamic: []
+
+# Utilisateur à l'intérieur du conteneur (non-root si possible)
+# Mettre à "root" si l'image ne supporte pas "bind".
+bind9_docker_user: "bind"
+
+# Gestion du pare-feu UFW
+bind9_manage_ufw: true
+
+# Commandes de healthcheck
+bind9_healthcheck_named_checkconf: true
+bind9_healthcheck_dig: true
+bind9_healthcheck_dig_target: "isc.org"
+bind9_healthcheck_dig_server: "172.16.100.254"
+

@@ -1,3 +1,12 @@
-#SPDX-License-Identifier: MIT-0
 ---
 # vars file for bind9_docker
+
+# Variables "fixes" liées à la sécurité / durcissement.
+
+# Permissions par défaut sur les répertoires de configuration/cache
+bind9_docker_dir_mode: "0750"
+bind9_docker_file_mode: "0640"
+
+# UFW : description des règles créées
+bind9_ufw_comment_tcp: "bind9 (tcp)"
+bind9_ufw_comment_udp: "bind9 (udp)"

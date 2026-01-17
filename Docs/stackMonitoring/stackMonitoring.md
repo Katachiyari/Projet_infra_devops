@@ -162,6 +162,23 @@ ansible-playbook -i inventory/hosts.yml playbooks/bind9-docker.yml
 Une fois appliquée, et à condition que les clients utilisent le serveur DNS interne (`172.16.100.254`),
 les noms ci-dessus sont résolus correctement.
 
+### 2.5. Autres services internes (Harbor, GitLab, tools-manager)
+
+Pour rester cohérent côté DNS, d'autres services de la plateforme ont également été déclarés dans la zone `lab.local` du même fichier `bind9dns.yml` :
+
+- `harbor.lab.local` → A `172.16.100.50`
+- `git-lab.lab.local` → A `172.16.100.40`
+- `gitlab.lab.local` → CNAME vers `git-lab.lab.local.`
+- `tools-manager.lab.local` → A `172.16.100.20`
+
+Points importants :
+- Sur le serveur Bind9, ces enregistrements sont déjà fonctionnels (vérifiables avec `dig @172.16.100.254 …`).
+- Sur la machine d'admin (Ubuntu avec `systemd-resolved`), le suffixe `.local` est géré de manière spéciale (mDNS). Pour garantir la résolution de `*.lab.local`, deux actions ont été faites :
+  - simplification de `nsswitch.conf` pour utiliser `hosts: files dns` ;
+  - ajout d'entrées explicites dans `/etc/hosts` pour `monitoring.lab.local`, `grafana.lab.local`, `prometheus.lab.local`, `alertmanager.lab.local`, `harbor.lab.local`, `git-lab.lab.local` / `gitlab.lab.local` et `tools-manager.lab.local`.
+
+Ainsi, même si le stub resolver local traite `.local` de façon particulière, l'admin peut accéder à l'ensemble des services internes par nom de domaine tout en gardant Bind9 comme source de vérité.
+
 ### 2.4. Validation par `curl`
 
 Depuis la machine de management, après déploiement :

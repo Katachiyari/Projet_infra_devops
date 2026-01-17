@@ -1,0 +1,38 @@
+---
+# SSOT: variables de la stack monitoring (Prometheus, Grafana, Alertmanager)
+
+# Versions (issues des releases officielles)
+prometheus_version: "v2.48.0"
+grafana_version: "10.2.3"
+alertmanager_version: "v0.26.0"
+node_exporter_version: "1.7.0"
+docker_compose_version: "v2.27.0"
+
+# Réseau
+monitoring_hostname: "monitoring.jdk.lab"
+
+# Stockage de base pour toute la stack
+monitoring_data_volume: "/data/monitoring"
+
+# Prometheus
+prometheus_port: 9090
+prometheus_retention_days: 15
+prometheus_scrape_interval: "15s"
+
+# Port d'écoute Node Exporter
+node_exporter_port: 9100
+
+# Grafana
+grafana_port: 3000
+grafana_admin_user: "admin"
+# Le mot de passe réel est stocké dans le vault
+grafana_admin_password: "{{ vault_grafana_admin_password }}"
+
+# Alertmanager
+alertmanager_port: 9093
+alertmanager_smtp_host: "smtp.lab.local"
+alertmanager_smtp_from: "alertmanager@lab.local"
+alertmanager_smtp_to: "admin@lab.local"
+alertmanager_smtp_username: "alertmanager@lab.local"
+# Mot de passe SMTP dans le vault
+alertmanager_smtp_password: "{{ vault_alertmanager_smtp_password }}"

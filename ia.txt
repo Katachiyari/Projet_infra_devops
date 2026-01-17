@@ -1,0 +1,412 @@
+# 🤖 Prompt pour IA : Déploiement Stack Monitoring
+
+***
+
+```markdown
+# CONTEXTE PROJET
+
+Tu es un expert DevSecOps. Tu travailles sur un projet d'infrastructure Proxmox existant géré avec Terraform et Ansible.
+
+## INFRASTRUCTURE EXISTANTE
+
+### VMs déjà déployées
+- `dns-server` (172.16.100.254) : Bind9 configuré
+- `harbor` (172.16.100.2) : Harbor Registry Docker
+- `tools-manager` (172.16.100.20) : Taiga + EdgeDoc
+- `gitlab` (172.16.100.30) : GitLab CE
+
+### Architecture Terraform/Ansible en place
+```
+projet-infra-devops/
+├── terraform.tfvars          # SSOT VMs
+├── main.tf                   # Provisionnement Proxmox
+├── provider.tf
+├── variables.tf
+│
+└── Ansible/
+    ├── inventory/
+    │   └── terraform.generated.yml
+    │
+    ├── group_vars/
+    │   ├── all.yml           # Config globale
+    │   └── dns_hosts.yml     # Config Bind9
+    │
+    ├── roles/
+    │   ├── common/           # Docker, firewall, base
+    │   ├── bind9/            # DNS
+    │   ├── harbor/           # Registry
+    │   ├── taiga/            # Gestion projet
+    │   ├── edgedoc/          # Documentation
+    │   └── gitlab/           # Git + CI/CD
+    │
+    └── playbooks/
+        ├── site.yml
+        ├── bind9.yml
+        ├── harbor.yml
+        └── gitlab.yml
+```
+
+### Standards du projet (IMPÉRATIFS)
+- ✅ **Idempotence stricte** : tout doit être rejouable sans erreur
+- ✅ **SSOT** : une seule source de vérité par configuration
+- ✅ **Docker Compose officiel** : pas de containers standalone
+- ✅ **Documentation officielle uniquement** : Prometheus, Grafana, Alertmanager docs
+- ✅ **DevSecOps** : sécurité dès la conception (pas de root, secrets chiffrés, firewall)
+- ✅ **DNS intégré** : ajout automatique dans Bind9
+- ✅ **Progressif** : version simple d'abord, complexité ajoutée après validation
+
+### Outils disponibles
+- Proxmox VE 9.1.1
+- Terraform avec provider `bpg/proxmox`
+- Ansible 2.16+
+- Ubuntu 24.04 LTS (templates cloud-init)
+- Docker Engine + Docker Compose v2
+- Bind9 pour DNS interne (zone `lab.local`)
+
+---
+
+# MISSION
+
+Créer une **nouvelle VM `monitoring-stack`** avec Prometheus + Grafana + Alertmanager sur une seule machine.
+
+## SPÉCIFICATIONS VM
+
+```yaml
+monitoring-stack:
+  ip: 172.16.100.40
+  hostname: monitoring.lab.local
+  cpu: 2
+  ram: 4096 MB
+  disk: 50 GB
+  bridge: vmbr0
+  pool: production
+  tags: [monitoring, observability, prod]
+```
+
+## SERVICES À DÉPLOYER (Stack unique)
+
+### 1. Prometheus
+- **Version** : Latest stable (v2.48+)
+- **Port** : 9090
+- **Rôle** : Collecte métriques (scraping)
+- **Targets** : 
+  - Node Exporter (toutes VMs)
+  - cAdvisor (Docker containers)
+  - Harbor metrics (si activé)
+  - GitLab metrics (si activé)
+- **Rétention** : 15 jours
+- **Storage** : `/data/prometheus`
+
+### 2. Grafana
+- **Version** : Latest stable (v10.2+)
+- **Port** : 3000
+- **Rôle** : Visualisation dashboards
+- **Datasource** : Prometheus (auto-configuré)
+- **Dashboards** : Import automatique (Node Exporter, Docker)
+- **Auth** : Admin password (Ansible Vault)
+- **Storage** : `/data/grafana`
+
+### 3. Alertmanager
+- **Version** : Latest stable (v0.26+)
+- **Port** : 9093
+- **Rôle** : Gestion alertes
+- **Notifications** : Email (SMTP) + webhook (optionnel)
+- **Storage** : `/data/alertmanager`
+
+### 4. Node Exporter (sur TOUTES les VMs)
+- **Version** : Latest stable
+- **Port** : 9100
+- **Rôle** : Métriques système (CPU, RAM, disk, network)
+- **Déploiement** : Systemd service (pas Docker pour éviter dépendance)
+
+---
+
+# LIVRABLES ATTENDUS
+
+## 1. Terraform
+
+### Fichier `terraform.tfvars` (ajout VM)
+Ajouter l'entrée `monitoring-stack` dans le map `nodes` existant.
+
+### Pas de modification des autres fichiers Terraform
+La structure existante doit fonctionner sans changement.
+
+---
+
+## 2. Ansible
+
+### A. Rôle `monitoring` (NOUVEAU)
+
+**Structure** :
+```
+roles/monitoring/
+├── defaults/main.yml       # Variables par défaut
+├── tasks/
+│   ├── main.yml           # Orchestration
+│   ├── prerequisites.yml   # Docker, dirs, firewall
+│   ├── prometheus.yml      # Config Prometheus
+│   ├── grafana.yml         # Config Grafana
+│   └── alertmanager.yml    # Config Alertmanager
+├── templates/
+│   ├── docker-compose.yml.j2
+│   ├── prometheus.yml.j2
+│   ├── alertmanager.yml.j2
+│   ├── grafana-datasources.yml.j2
+│   └── alert-rules.yml.j2
+├── handlers/main.yml       # Restart services
+└── files/
+    └── dashboards/         # Dashboards JSON Grafana
+        ├── node-exporter.json
+        └── docker-containers.json
+```
+
+**Fonctionnalités** :
+- Installation Docker Compose stack (idempotent)
+- Configuration Prometheus avec auto-discovery des targets depuis inventaire Ansible
+- Configuration Grafana avec datasource Prometheus
+- Import automatique dashboards Grafana
+- Configuration Alertmanager avec règles de base
+- Firewall UFW (ports 9090, 3000, 9093)
+- Backup automatique `/data/monitoring` (optionnel)
+
+### B. Rôle `node_exporter` (NOUVEAU)
+
+**Structure** :
+```
+roles/node_exporter/
+├── defaults/main.yml
+├── tasks/main.yml
+├── templates/
+│   └── node_exporter.service.j2
+└── handlers/main.yml
+```
+
+**Fonctionnalités** :
+- Installation Node Exporter (binaire officiel)
+- Service systemd
+- Firewall (port 9100 depuis monitoring-stack uniquement)
+- Idempotent
+
+### C. Fichier `group_vars/monitoring_hosts.yml` (NOUVEAU)
+
+Variables SSOT pour la stack monitoring :
+```yaml
+# Versions (sources officielles)
+prometheus_version: "v2.48.0"
+grafana_version: "10.2.3"
+alertmanager_version: "v0.26.0"
+node_exporter_version: "1.7.0"
+
+# Réseau
+monitoring_hostname: "monitoring.lab.local"
+
+# Stockage
+monitoring_data_volume: "/data/monitoring"
+
+# Prometheus
+prometheus_port: 9090
+prometheus_retention_days: 15
+prometheus_scrape_interval: "15s"
+
+# Auto-discovery targets depuis inventaire
+prometheus_targets:
+  - job_name: node-exporter
+    static_configs:
+      - targets: # AUTO-GÉNÉRÉ depuis groups['all']
+
+# Grafana
+grafana_port: 3000
+grafana_admin_user: admin
+grafana_admin_password: "{{ vault_grafana_admin_password }}"
+
+# Alertmanager
+alertmanager_port: 9093
+alertmanager_smtp_host: "smtp.lab.local"
+alertmanager_smtp_from: "alertmanager@lab.local"
+alertmanager_smtp_to: "admin@lab.local"
+```
+
+### D. Fichier `secrets/monitoring.vault` (NOUVEAU)
+
+Secrets chiffrés Ansible Vault :
+```yaml
+vault_grafana_admin_password: "Graf@naAdm!n2024"
+vault_alertmanager_smtp_password: "SmtpP@ss2024"
+```
+
+### E. Playbook `playbooks/monitoring.yml` (NOUVEAU)
+
+```yaml
+***
+- name: Déploiement Stack Monitoring
+  hosts: monitoring_hosts
+  become: true
+  
+  roles:
+    - common              # Prérequis (Docker)
+    - monitoring          # Stack complète
+
+- name: Installation Node Exporter (toutes VMs)
+  hosts: all
+  become: true
+  
+  roles:
+    - node_exporter
+```
+
+---
+
+## 3. DNS (Bind9)
+
+### Modification `group_vars/dns_hosts.yml`
+
+Ajouter les enregistrements DNS :
+```yaml
+bind9_zones:
+  - name: "lab.local"
+    records:
+      # ... (enregistrements existants)
+      
+      # Monitoring Stack
+      - name: "monitoring"
+        type: A
+        value: "172.16.100.40"
+      
+      - name: "grafana"
+        type: CNAME
+        value: "monitoring.lab.local."
+      
+      - name: "prometheus"
+        type: CNAME
+        value: "monitoring.lab.local."
+      
+      - name: "alertmanager"
+        type: CNAME
+        value: "monitoring.lab.local."
+```
+
+---
+
+## 4. Documentation
+
+### Fichier `docs/monitoring-stack.md` (NOUVEAU)
+
+Documentation complète :
+- Architecture de la stack
+- Configuration Prometheus (targets, rules)
+- Dashboards Grafana disponibles
+- Configuration alertes
+- Commandes maintenance (backup, restore)
+- Troubleshooting
+
+---
+
+# CONTRAINTES TECHNIQUES
+
+## Sécurité DevSecOps
+- ❌ Pas de `latest` tag Docker (versions explicites)
+- ✅ Utilisateurs non-root dans containers
+- ✅ Secrets dans Ansible Vault uniquement
+- ✅ Firewall UFW strict (ports minimum)
+- ✅ HTTPS pour Grafana (certificat auto-signé ou Let's Encrypt)
+- ✅ Authentification activée (pas d'accès anonyme)
+
+## Idempotence
+- Tous les tasks Ansible doivent être rejouables sans erreur
+- Utiliser modules Ansible (`docker_compose`, `template`, `file`) pas `shell`
+- Handlers pour restart services uniquement si config change
+
+## Performance
+- Prometheus : scrape interval 15s (pas moins)
+- Rétention 15 jours maximum (petit lab)
+- Grafana : pas de plugins externes (version de base)
+
+## Intégration inventaire Ansible
+- Auto-discovery targets Prometheus depuis `groups['all']`
+- Pas de hardcoding d'IPs (utiliser `hostvars`)
+
+---
+
+# COMMANDES DE DÉPLOIEMENT ATTENDUES
+
+```bash
+# 1. Créer VM
+terraform apply -target=proxmox_virtual_environment_vm.vm[\"monitoring-stack\"]
+
+# Attendre cloud-init
+sleep 60
+
+# 2. Déployer stack monitoring
+cd Ansible/
+ansible-playbook playbooks/monitoring.yml --ask-vault-pass
+
+# 3. Installer Node Exporter partout
+ansible-playbook playbooks/monitoring.yml --tags node_exporter
+
+# 4. Mettre à jour DNS
+ansible-playbook playbooks/bind9.yml
+
+# 5. Valider
+curl http://monitoring.lab.local:9090/targets       # Prometheus targets
+curl http://grafana.lab.local:3000/api/health      # Grafana health
+```
+
+---
+
+# VALIDATION FINALE
+
+## Tests de fonctionnement
+- [ ] Prometheus UI accessible : `http://monitoring.lab.local:9090`
+- [ ] Prometheus scrape toutes les VMs (Node Exporter)
+- [ ] Grafana UI accessible : `http://grafana.lab.local:3000`
+- [ ] Login Grafana avec admin password
+- [ ] Datasource Prometheus configuré automatiquement
+- [ ] Dashboards importés visibles
+- [ ] Alertmanager UI accessible : `http://monitoring.lab.local:9093`
+- [ ] Résolution DNS : `dig monitoring.lab.local @172.16.100.254`
+- [ ] Firewall : ports 9090, 3000, 9093 ouverts uniquement
+
+## Tests idempotence
+```bash
+# Rejouer sans erreur
+ansible-playbook playbooks/monitoring.yml --ask-vault-pass
+# → 0 changed, 0 failed
+```
+
+---
+
+# FORMAT DE RÉPONSE ATTENDU
+
+Fournis le code complet des fichiers suivants dans l'ordre :
+
+1. **terraform.tfvars** (extrait ajout VM)
+2. **group_vars/monitoring_hosts.yml** (complet)
+3. **secrets/monitoring.vault** (complet)
+4. **roles/monitoring/defaults/main.yml** (complet)
+5. **roles/monitoring/tasks/main.yml** (complet)
+6. **roles/monitoring/templates/docker-compose.yml.j2** (complet)
+7. **roles/monitoring/templates/prometheus.yml.j2** (complet)
+8. **roles/monitoring/templates/alertmanager.yml.j2** (complet)
+9. **roles/monitoring/templates/grafana-datasources.yml.j2** (complet)
+10. **roles/node_exporter/tasks/main.yml** (complet)
+11. **roles/node_exporter/templates/node_exporter.service.j2** (complet)
+12. **playbooks/monitoring.yml** (complet)
+13. **group_vars/dns_hosts.yml** (extrait ajout DNS)
+14. **docs/monitoring-stack.md** (complet)
+
+Pour chaque fichier :
+- Chemin complet
+- Rôle (SSOT ou non)
+- Code complet avec commentaires explicatifs
+- Aucun placeholder (`...`, `# TODO`, etc.)
+
+Utilise UNIQUEMENT les documentations officielles :
+- https://prometheus.io/docs/prometheus/latest/
+- https://grafana.com/docs/grafana/latest/
+- https://prometheus.io/docs/alerting/latest/alertmanager/
+
+Commence maintenant.
+```
+
+***
+

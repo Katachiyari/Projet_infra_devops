@@ -1,0 +1,8 @@
+---
+# Handlers du rôle monitoring
+
+- name: restart docker compose stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_config_dir }}"
+    state: present
+  listen: "restart monitoring stack"

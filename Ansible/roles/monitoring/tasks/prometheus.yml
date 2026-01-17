@@ -1,0 +1,16 @@
+---
+# Configuration de Prometheus
+
+- name: "Générer la configuration Prometheus"
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ monitoring_prometheus_config_path }}"
+    mode: "0644"
+  notify: "restart monitoring stack"
+
+- name: "Générer les règles d'alerte Prometheus"
+  ansible.builtin.template:
+    src: alert-rules.yml.j2
+    dest: "{{ monitoring_alert_rules_path }}"
+    mode: "0644"
+  notify: "restart monitoring stack"

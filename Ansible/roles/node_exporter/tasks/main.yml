@@ -1,0 +1,78 @@
+---
+# Installation et configuration de Node Exporter
+
+- name: "Créer l'utilisateur système node_exporter"
+  ansible.builtin.user:
+    name: "{{ node_exporter_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: "Créer le répertoire d'installation de Node Exporter"
+  ansible.builtin.file:
+    path: "{{ node_exporter_install_dir }}"
+    state: directory
+    owner: "{{ node_exporter_user }}"
+    group: "{{ node_exporter_group }}"
+    mode: "0755"
+
+- name: "Télécharger l'archive Node Exporter"
+  ansible.builtin.get_url:
+    url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+    dest: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+    mode: "0644"
+  register: node_exporter_download
+
+- name: "Décompresser Node Exporter"
+  ansible.builtin.unarchive:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+    dest: "{{ node_exporter_install_dir }}"
+    remote_src: true
+    creates: "{{ node_exporter_install_dir }}/node_exporter-{{ node_exporter_version }}.linux-amd64"
+
+- name: "Installer le binaire Node Exporter"
+  ansible.builtin.copy:
+    src: "{{ node_exporter_install_dir }}/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+    dest: "{{ node_exporter_bin_dir }}/node_exporter"
+    mode: "0755"
+    owner: "{{ node_exporter_user }}"
+    group: "{{ node_exporter_group }}"
+    remote_src: true
+  notify: "restart node_exporter service"
+
+- name: "Installer le service systemd node_exporter"
+  ansible.builtin.template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    mode: "0644"
+  notify: "restart node_exporter service"
+
+- name: "Recharger systemd et activer le service Node Exporter"
+  ansible.builtin.systemd:
+    name: "{{ node_exporter_service_name }}"
+    enabled: true
+    daemon_reload: true
+    state: started
+
+# Firewall : port 9100 accessible uniquement depuis la VM monitoring-stack (si UFW actif)
+- name: "Vérifier si UFW est installé (Node Exporter)"
+  ansible.builtin.stat:
+    path: /usr/sbin/ufw
+  register: node_ufw_binary
+
+- name: "Vérifier si UFW est actif (Node Exporter)"
+  ansible.builtin.command: ufw status
+  register: node_ufw_status
+  changed_when: false
+  failed_when: false
+  when: node_ufw_binary.stat.exists
+
+- name: "Autoriser Node Exporter depuis monitoring-stack uniquement (si UFW actif)"
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ node_exporter_port }}"
+    proto: tcp
+    src: "172.16.100.60"
+  when:
+    - node_ufw_binary.stat.exists
+    - '"Status: active" in (node_ufw_status.stdout | default("") )'

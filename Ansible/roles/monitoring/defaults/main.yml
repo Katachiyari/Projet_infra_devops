@@ -1,0 +1,30 @@
+---
+# Variables par défaut du rôle monitoring
+# SSOT des valeurs métier dans inventory/group_vars/monitoring_hosts.yml
+
+# Répertoire de base pour les données et configurations de la stack monitoring
+monitoring_base_dir: "{{ monitoring_data_volume | default('/data/monitoring') }}"
+
+# Répertoires de données
+monitoring_prometheus_data_dir: "{{ monitoring_base_dir }}/prometheus"
+monitoring_grafana_data_dir: "{{ monitoring_base_dir }}/grafana"
+monitoring_alertmanager_data_dir: "{{ monitoring_base_dir }}/alertmanager"
+
+# Répertoires de configuration
+monitoring_config_dir: "{{ monitoring_base_dir }}/config"
+monitoring_grafana_provisioning_dir: "{{ monitoring_config_dir }}/grafana/provisioning"
+monitoring_grafana_datasources_dir: "{{ monitoring_grafana_provisioning_dir }}/datasources"
+monitoring_grafana_dashboards_dir: "{{ monitoring_grafana_provisioning_dir }}/dashboards"
+
+# Fichiers de configuration générés
+monitoring_docker_compose_path: "{{ monitoring_config_dir }}/docker-compose.yml"
+monitoring_prometheus_config_path: "{{ monitoring_config_dir }}/prometheus.yml"
+monitoring_alertmanager_config_path: "{{ monitoring_config_dir }}/alertmanager.yml"
+monitoring_alert_rules_path: "{{ monitoring_config_dir }}/alert-rules.yml"
+monitoring_grafana_datasources_path: "{{ monitoring_grafana_datasources_dir }}/datasources.yml"
+
+# Noms des services Docker Compose
+monitoring_docker_network: "monitoring_net"
+monitoring_prometheus_service_name: "prometheus"
+monitoring_grafana_service_name: "grafana"
+monitoring_alertmanager_service_name: "alertmanager"

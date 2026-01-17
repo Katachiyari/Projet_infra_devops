@@ -1,0 +1,9 @@
+---
+# Configuration d'Alertmanager
+
+- name: "Générer la configuration Alertmanager"
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ monitoring_alertmanager_config_path }}"
+    mode: "0644"
+  notify: "restart monitoring stack"

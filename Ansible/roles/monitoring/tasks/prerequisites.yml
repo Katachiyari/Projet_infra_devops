@@ -1,0 +1,101 @@
+---
+# Installation des prérequis pour la stack monitoring
+
+- name: "Installer paquets Docker et dépendances (Docker Engine)"
+  ansible.builtin.apt:
+    name:
+      - docker.io
+      - python3-docker
+    state: present
+    update_cache: true
+
+- name: "Créer le répertoire des plugins CLI Docker"
+  ansible.builtin.file:
+    path: /usr/local/lib/docker/cli-plugins
+    state: directory
+    mode: "0755"
+
+- name: "Installer Docker Compose v2 (plugin CLI officiel)"
+  ansible.builtin.get_url:
+    url: "https://github.com/docker/compose/releases/download/{{ docker_compose_version }}/docker-compose-linux-x86_64"
+    dest: /usr/local/lib/docker/cli-plugins/docker-compose
+    mode: "0755"
+    force: false
+
+- name: "S'assurer que le service Docker est démarré"
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: "Créer les répertoires de données monitoring"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ monitoring_base_dir }}"
+    - "{{ monitoring_prometheus_data_dir }}"
+    - "{{ monitoring_grafana_data_dir }}"
+    - "{{ monitoring_alertmanager_data_dir }}"
+
+- name: "Ajuster les permissions du répertoire de données Prometheus"
+  ansible.builtin.file:
+    path: "{{ monitoring_prometheus_data_dir }}"
+    state: directory
+    owner: "65534"
+    group: "65534"
+    mode: "0750"
+
+- name: "Ajuster les permissions du répertoire de données Grafana"
+  ansible.builtin.file:
+    path: "{{ monitoring_grafana_data_dir }}"
+    state: directory
+    owner: "472"
+    group: "472"
+    mode: "0750"
+
+- name: "Ajuster les permissions du répertoire de données Alertmanager"
+  ansible.builtin.file:
+    path: "{{ monitoring_alertmanager_data_dir }}"
+    state: directory
+    owner: "65534"
+    group: "65534"
+    mode: "0750"
+
+- name: "Créer les répertoires de configuration monitoring"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ monitoring_config_dir }}"
+    - "{{ monitoring_grafana_provisioning_dir }}"
+    - "{{ monitoring_grafana_datasources_dir }}"
+    - "{{ monitoring_grafana_dashboards_dir }}"
+
+# Firewall : ouvrir les ports nécessaires si UFW est présent et actif
+- name: "Vérifier si UFW est installé"
+  ansible.builtin.stat:
+    path: /usr/sbin/ufw
+  register: ufw_binary
+
+- name: "Vérifier si UFW est actif"
+  ansible.builtin.command: ufw status
+  register: ufw_status
+  changed_when: false
+  failed_when: false
+  when: ufw_binary.stat.exists
+
+- name: "Ouvrir les ports Prometheus, Grafana, Alertmanager via UFW (si actif)"
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "{{ prometheus_port }}"
+    - "{{ grafana_port }}"
+    - "{{ alertmanager_port }}"
+  when:
+    - ufw_binary.stat.exists
+    - '"Status: active" in (ufw_status.stdout | default("") )'

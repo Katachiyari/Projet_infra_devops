@@ -1,0 +1,19 @@
+---
+- name: Déploiement Stack Monitoring
+  hosts: monitoring_hosts
+  become: true
+  vars_files:
+    - "../secrets/monitoring.vault"
+
+  roles:
+    - role: monitoring
+
+- name: Installation Node Exporter (toutes VMs)
+  hosts: all
+  become: true
+  vars_files:
+    - "../secrets/monitoring.vault"
+
+  roles:
+    - role: node_exporter
+      tags: ["node_exporter"]

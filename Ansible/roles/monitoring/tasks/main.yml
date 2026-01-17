@@ -1,0 +1,33 @@
+---
+# Orchestration de la stack monitoring (Prometheus, Grafana, Alertmanager)
+
+- name: "Pré-requis monitoring (Docker, répertoires, firewall)"
+  ansible.builtin.import_tasks: prerequisites.yml
+
+- name: "Configurer Prometheus"
+  ansible.builtin.import_tasks: prometheus.yml
+
+- name: "Configurer Alertmanager"
+  ansible.builtin.import_tasks: alertmanager.yml
+
+- name: "Configurer Grafana"
+  ansible.builtin.import_tasks: grafana.yml
+
+- name: "Générer le fichier docker-compose de la stack monitoring"
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ monitoring_docker_compose_path }}"
+    mode: "0644"
+  notify: "restart monitoring stack"
+
+- name: "Déployer/mettre à jour la stack Docker Compose monitoring"
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_config_dir }}"
+    files:
+      - "{{ monitoring_docker_compose_path }}"
+    state: present
+  register: monitoring_compose_result
+
+- name: "Afficher l'état de la stack monitoring"
+  ansible.builtin.debug:
+    var: monitoring_compose_result

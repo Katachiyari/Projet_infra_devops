@@ -1,0 +1,22 @@
+{% raw %}
+groups:
+  - name: node_exporter_basic_rules
+    rules:
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instance {{ $labels.instance }} down"
+          description: "{{ $labels.instance }} est injoignable depuis plus d'une minute."
+
+      - alert: HighCPUUsage
+        expr: avg by(instance) (rate(node_cpu_seconds_total{mode!="idle"}[5m])) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU élevé sur {{ $labels.instance }}"
+          description: "La charge CPU moyenne dépasse 80 % depuis 5 minutes."
+{% endraw %}

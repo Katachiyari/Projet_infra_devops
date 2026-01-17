@@ -1,0 +1,10 @@
+{
+  "title": "Docker Containers - Vue synthétique",
+  "schemaVersion": 38,
+  "version": 1,
+  "panels": [],
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  }
+}

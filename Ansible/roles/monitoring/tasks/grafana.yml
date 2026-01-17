@@ -1,0 +1,19 @@
+---
+# Configuration de Grafana (datasource + dashboards)
+
+- name: "Générer la configuration des datasources Grafana"
+  ansible.builtin.template:
+    src: grafana-datasources.yml.j2
+    dest: "{{ monitoring_grafana_datasources_path }}"
+    mode: "0644"
+  notify: "restart monitoring stack"
+
+- name: "Copier les dashboards Grafana fournis"
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ monitoring_grafana_dashboards_dir }}/{{ item | basename }}"
+    mode: "0644"
+  loop:
+    - "dashboards/node-exporter.json"
+    - "dashboards/docker-containers.json"
+  notify: "restart monitoring stack"

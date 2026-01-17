@@ -192,3 +192,27 @@ Une fois la configuration appliquée, tu peux vérifier côté `bind9dns` :
 getent hosts ubuntu-host.jdk.lab
 ping ubuntu-host.jdk.lab
 ```
+
+## 8. (Optionnel) Rollback de cette configuration
+
+Un tag Git est créé après la configuration de Bind9 pour `ubuntu-host` :
+
+- Tag : `rollback-bind9-ubuntu-host-20260117`
+
+Pour revenir à l'état des fichiers liés à Bind9 à ce moment-là (sans changer de branche entière), depuis la racine du repo :
+
+```bash
+git fetch --tags
+git checkout rollback-bind9-ubuntu-host-20260117 -- \
+  Ansible/inventory/host_vars/bind9dns.yml \
+  BIND9_DEPLOYMENT.md
+
+# Puis créer un nouveau commit si tu veux figer ce rollback
+git commit -am "Rollback Bind9 ubuntu-host configuration to tag rollback-bind9-ubuntu-host-20260117"
+```
+
+Si tu veux revenir sur tout le repo (pas seulement ces fichiers), tu peux aussi repartir de ce tag dans une nouvelle branche :
+
+```bash
+git checkout -b debug-bind9-rollback rollback-bind9-ubuntu-host-20260117
+```

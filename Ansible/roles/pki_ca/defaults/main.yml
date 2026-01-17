@@ -1,0 +1,35 @@
+---
+pki_ca_root_dir: "/opt/ca"
+pki_ca_backup_dir: "/backup/ca"
+
+pki_ca_root_key_file: "{{ pki_ca_root_dir }}/root-ca.key"
+pki_ca_root_cert_file: "{{ pki_ca_root_dir }}/root-ca.crt"
+
+pki_ca_root_subject: "/C=FR/ST=IDF/L=Paris/O=Lab/CN=Lab Root CA"
+pki_ca_root_validity_days: 3650
+
+pki_ca_server_validity_days: 825
+
+pki_ca_wildcard_key_file: "{{ pki_ca_root_dir }}/wildcard.lab.local.key"
+pki_ca_wildcard_csr_file: "{{ pki_ca_root_dir }}/wildcard.lab.local.csr"
+pki_ca_wildcard_cert_file: "{{ pki_ca_root_dir }}/wildcard.lab.local.crt"
+pki_ca_wildcard_ext_file: "{{ pki_ca_root_dir }}/wildcard.lab.local.ext"
+
+pki_ca_trust_store_path: "/usr/local/share/ca-certificates/lab-root-ca.crt"
+
+pki_ca_server_certificates:
+  - name: "harbor.lab.local"
+    key_file: "{{ pki_ca_root_dir }}/harbor.lab.local.key"
+    csr_file: "{{ pki_ca_root_dir }}/harbor.lab.local.csr"
+    cert_file: "{{ pki_ca_root_dir }}/harbor.lab.local.crt"
+    subject: "/C=FR/ST=IDF/L=Paris/O=Lab/CN=harbor.lab.local"
+  - name: "gitlab.lab.local"
+    key_file: "{{ pki_ca_root_dir }}/gitlab.lab.local.key"
+    csr_file: "{{ pki_ca_root_dir }}/gitlab.lab.local.csr"
+    cert_file: "{{ pki_ca_root_dir }}/gitlab.lab.local.crt"
+    subject: "/C=FR/ST=IDF/L=Paris/O=Lab/CN=gitlab.lab.local"
+  - name: "portainer.lab.local"
+    key_file: "{{ pki_ca_root_dir }}/portainer.lab.local.key"
+    csr_file: "{{ pki_ca_root_dir }}/portainer.lab.local.csr"
+    cert_file: "{{ pki_ca_root_dir }}/portainer.lab.local.crt"
+    subject: "/C=FR/ST=IDF/L=Paris/O=Lab/CN=portainer.lab.local"

@@ -1,0 +1,18 @@
+---
+- name: Preconditions for Portainer
+  ansible.builtin.import_tasks: prerequisites.yml
+
+- name: Install Portainer dependencies
+  ansible.builtin.import_tasks: install.yml
+
+- name: Configure Portainer Docker Compose
+  ansible.builtin.import_tasks: configure.yml
+
+- name: Deploy Portainer stack
+  ansible.builtin.import_tasks: deploy.yml
+
+- name: Apply Portainer security hardening
+  ansible.builtin.import_tasks: security.yml
+
+- name: Validate Portainer deployment
+  ansible.builtin.import_tasks: validation.yml

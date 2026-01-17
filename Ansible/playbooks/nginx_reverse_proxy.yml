@@ -1,0 +1,10 @@
+---
+# Playbook Mission 1 - Nginx Reverse Proxy
+
+- name: Deploy Nginx reverse proxy with SSL termination for lab.local
+  hosts: reverse-proxy
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: nginx_reverse_proxy

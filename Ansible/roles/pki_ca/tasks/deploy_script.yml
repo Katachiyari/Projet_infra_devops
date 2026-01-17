@@ -1,0 +1,8 @@
+---
+- name: Deploy certificate renewal script
+  ansible.builtin.template:
+    src: renew_certs.sh.j2
+    dest: "{{ pki_ca_root_dir }}/renew_certs.sh"
+    owner: root
+    group: root
+    mode: "0700"

@@ -1,0 +1,52 @@
+---
+# Defaults for nginx_reverse_proxy (Mission 1)
+
+nginx_rp_install_dir: /data/nginx
+nginx_rp_config_dir: "{{ nginx_rp_install_dir }}/config"
+nginx_rp_logs_dir: "{{ nginx_rp_install_dir }}/logs"
+nginx_rp_ssl_dir: "/opt/ca"
+
+# IP d'écoute du reverse proxy (VM reverse-proxy)
+nginx_rp_ip: "172.16.100.253"
+
+nginx_rp_docker_compose_path: "{{ nginx_rp_config_dir }}/docker-compose.yml"
+
+nginx_rp_image: "nginx:1.25-alpine"
+nginx_rp_exporter_image: "nginx/nginx-prometheus-exporter:1.3.0"
+
+nginx_rp_http_port: 80
+nginx_rp_https_port: 443
+nginx_rp_metrics_port: 9113
+nginx_rp_health_port: 8080
+
+nginx_rp_domain: "lab.local"
+
+nginx_rp_backends:
+  harbor:
+    host: "172.16.100.50"
+    port: 80
+  portainer:
+    host: "172.16.100.50"
+    port: 9000
+  gitlab:
+    host: "172.16.100.30"
+    port: 80
+  gitlab_registry:
+    host: "172.16.100.30"
+    port: 5050
+  taiga:
+    host: "172.16.100.60"
+    port: 80
+  edgedoc:
+    host: "172.16.100.60"
+    port: 8080
+
+# UFW firewall rules for reverse proxy
+nginx_rp_firewall_rules:
+  - { port: 80,  allowed_ip: "0.0.0.0/0" }
+  - { port: 443, allowed_ip: "0.0.0.0/0" }
+  - { port: 9113, allowed_ip: "172.16.100.0/24" }
+  - { port: 8080, allowed_ip: "172.16.100.0/24" }
+
+# Name for docker compose project
+nginx_rp_project_name: "nginx_reverse_proxy"

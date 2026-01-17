@@ -1,0 +1,8 @@
+---
+- name: Deploy Portainer Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ portainer_install_dir }}/docker-compose.yml"
+    owner: root
+    group: root
+    mode: "0644"

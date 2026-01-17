@@ -1,0 +1,17 @@
+---
+- name: Test Harbor HTTP health endpoint (local)
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ harbor_http_port }}/api/v2.0/health"
+    status_code: 200
+  register: harbor_http_health
+
+- name: Test Harbor health via reverse proxy (HTTPS)
+  ansible.builtin.uri:
+    url: "https://127.0.0.1/api/v2.0/health"
+    headers:
+      Host: "{{ harbor_hostname }}"
+    validate_certs: no
+    status_code: 200
+  register: harbor_https_health
+  delegate_to: reverse-proxy
+

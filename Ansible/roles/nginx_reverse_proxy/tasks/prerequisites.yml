@@ -1,0 +1,20 @@
+---
+- name: Ensure Nginx reverse proxy base directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ nginx_rp_install_dir }}"
+    - "{{ nginx_rp_config_dir }}"
+    - "{{ nginx_rp_logs_dir }}"
+
+- name: Ensure SSL directory for wildcard certificates exists
+  ansible.builtin.file:
+    path: "{{ nginx_rp_ssl_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"

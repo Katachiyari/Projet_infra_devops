@@ -3,7 +3,7 @@
 ## Objectif
 - **Terraform** crée les VMs sur Proxmox et injecte l’accès SSH (utilisateur `ansible` + clé publique).
 - **cloud-init** fait le bootstrap OS (qemu-guest-agent, durcissement SSH, sudoers).
-- **Ansible** configure les services (Taiga, Bind9, …) de façon idempotente.
+- **Ansible** configure les services (Taiga, Bind9, reverse-proxy, Harbor/Portainer, monitoring, …) de façon idempotente.
 
 ## Connexion 100% automatisée (principe)
 1. **Une seule source de vérité pour l’accès SSH** : la clé publique est fournie à Terraform (`ssh_public_key`).
@@ -29,3 +29,17 @@ Dans `Ansible/`:
 - `./run-ping-test.sh` (réseau direct)
 - `./run-ping-test.sh --bastion` (via ProxyJump)
 - `./run-ping-test.sh --key ~/.ssh/id_ed25519_common`
+
+## Documentation SSOT de la stack
+
+Une vue d’ensemble détaillée de l’architecture DevSecOps (PKI locale, Nginx reverse-proxy HTTPS, Harbor/Portainer, stack monitoring, DNS Bind9, flux réseau) est disponible dans :
+
+- [Docs/stackGlobal/SSOT-DevSecOps-stack.md](Docs/stackGlobal/SSOT-DevSecOps-stack.md)
+
+URLs principales (via le reverse-proxy et/ou directement) une fois la stack déployée et la CA importée dans le navigateur :
+
+- Harbor : `https://harbor.lab.local/`
+- Portainer : `https://portainer.lab.local/`
+- Prometheus : `http://prometheus.lab.local:9090/`
+- Grafana : `http://grafana.lab.local:3000/`
+- Alertmanager : `http://alertmanager.lab.local:9093/`

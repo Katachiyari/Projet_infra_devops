@@ -1,0 +1,54 @@
+---
+- name: Test DNS resolution for reverse proxy entries
+  ansible.builtin.shell: "dig +short {{ item }}.{{ nginx_rp_domain }} @172.16.100.254"
+  loop:
+    - harbor
+    - gitlab
+    - portainer
+    - taiga
+    - edgedoc
+  register: nginx_rp_dns_test
+
+- name: Fail if reverse proxy IP not returned by DNS
+  ansible.builtin.fail:
+    msg: "DNS for one or more services does not resolve to Nginx reverse proxy IP {{ nginx_rp_ip }}"
+  when: nginx_rp_ip not in (nginx_rp_dns_test.results | map(attribute='stdout') | join('\n'))
+
+- name: Test HTTP to HTTPS redirect for Harbor
+  ansible.builtin.uri:
+    url: "http://{{ nginx_rp_ip }}"
+    headers:
+      Host: "harbor.{{ nginx_rp_domain }}"
+    follow_redirects: none
+    status_code: 301
+  register: nginx_rp_redirect_test
+
+- name: Test SSL certificate validity for Harbor
+  ansible.builtin.command: >-
+    openssl s_client -connect {{ nginx_rp_ip }}:{{ nginx_rp_https_port }}
+    -servername harbor.{{ nginx_rp_domain }}
+    -CAfile {{ nginx_rp_ssl_dir }}/root-ca.crt
+  register: nginx_rp_ssl_test
+  changed_when: false
+
+- name: Fail if SSL certificate chain is not valid
+  ansible.builtin.fail:
+    msg: "SSL certificate validation failed for harbor.{{ nginx_rp_domain }}"
+  when: "'Verify return code: 0 (ok)' not in nginx_rp_ssl_test.stdout"
+
+- name: Test security headers from Harbor via reverse proxy
+  ansible.builtin.uri:
+    url: "https://{{ nginx_rp_ip }}"
+    headers:
+      Host: "harbor.{{ nginx_rp_domain }}"
+    validate_certs: false
+    status_code: [200, 502]
+    return_content: yes
+  register: nginx_rp_headers_test
+
+- name: Fail if mandatory security headers are missing
+  ansible.builtin.fail:
+    msg: "Missing mandatory security headers on Harbor reverse proxy"
+  when: >-
+    (nginx_rp_headers_test.strict_transport_security is not defined) or
+    (nginx_rp_headers_test.x_frame_options is not defined)

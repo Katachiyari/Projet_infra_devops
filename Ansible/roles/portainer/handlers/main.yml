@@ -1,0 +1,5 @@
+---
+- name: restart portainer stack
+  ansible.builtin.command:
+    cmd: "docker compose -f {{ portainer_install_dir }}/docker-compose.yml -p {{ portainer_compose_project_name }} up -d"
+  changed_when: false

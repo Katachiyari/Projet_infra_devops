@@ -1,0 +1,18 @@
+---
+- name: Run Harbor install script if not yet installed
+  ansible.builtin.command:
+    cmd: "./install.sh --with-trivy"
+    chdir: "{{ harbor_install_dir }}/harbor"
+  args:
+    creates: "{{ harbor_install_dir }}/harbor/common/config/core/app.conf"
+
+- name: Ensure Harbor Docker Compose stack is present (idempotent)
+  community.docker.docker_compose_v2:
+    project_src: "{{ harbor_install_dir }}/harbor"
+    project_name: "{{ harbor_compose_project_name }}"
+    state: present
+  register: harbor_compose_result
+
+- name: Show Harbor Docker Compose result
+  ansible.builtin.debug:
+    var: harbor_compose_result

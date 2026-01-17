@@ -1,0 +1,51 @@
+---
+- name: Ensure CA private key permissions
+  ansible.builtin.file:
+    path: "{{ pki_ca_root_key_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Ensure wildcard private key permissions
+  ansible.builtin.file:
+    path: "{{ pki_ca_wildcard_key_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Ensure server private key permissions
+  ansible.builtin.file:
+    path: "{{ item.key_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+  loop: "{{ pki_ca_server_certificates }}"
+
+- name: Ensure CA root directory permissions
+  ansible.builtin.file:
+    path: "{{ pki_ca_root_dir }}"
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Ensure CA backup directory permissions
+  ansible.builtin.file:
+    path: "{{ pki_ca_backup_dir }}"
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Backup CA root private key
+  ansible.builtin.stat:
+    path: "{{ pki_ca_backup_dir }}/root-ca.key"
+  register: pki_ca_backup_key
+
+- name: Copy CA root private key to backup
+  ansible.builtin.copy:
+    src: "{{ pki_ca_root_key_file }}"
+    dest: "{{ pki_ca_backup_dir }}/root-ca.key"
+    owner: root
+    group: root
+    mode: "0600"
+    remote_src: true
+  when: not pki_ca_backup_key.stat.exists

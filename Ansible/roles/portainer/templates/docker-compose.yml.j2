@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+  portainer:
+    image: {{ portainer_image }}
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "{{ portainer_http_port }}:9000"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "{{ portainer_data_dir }}:/data"

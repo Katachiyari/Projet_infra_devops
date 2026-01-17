@@ -1,0 +1,11 @@
+---
+# Playbook Mission 0 - PKI CA
+# Ne modifie pas les autres rôles/playbooks existants.
+
+- name: Deploy local PKI CA for lab.local
+  hosts: reverse-proxy
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: pki_ca

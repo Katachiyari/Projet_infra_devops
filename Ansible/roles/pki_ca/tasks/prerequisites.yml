@@ -1,0 +1,42 @@
+---
+- name: Ensure PKI root directory exists
+  ansible.builtin.file:
+    path: "{{ pki_ca_root_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Ensure PKI backup directory exists
+  ansible.builtin.file:
+    path: "{{ pki_ca_backup_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Ensure PKI certs directory exists
+  ansible.builtin.file:
+    path: "{{ pki_ca_root_dir }}/certs"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Ensure PKI certs README exists
+  ansible.builtin.copy:
+    dest: "{{ pki_ca_root_dir }}/certs/README.md"
+    owner: root
+    group: root
+    mode: "0644"
+    force: false
+    content: |
+      # PKI Certificates Directory
+
+      This directory is managed by the Ansible role `pki_ca`.
+
+      It stores public certificates issued by the local lab Root CA
+      for services such as Harbor, GitLab, Portainer and others.
+
+      Private keys remain in {{ pki_ca_root_dir }} with strict 0600
+      permissions and MUST be backed up securely from there.

@@ -1,0 +1,24 @@
+---
+- name: Remove existing Nginx reverse proxy stack (Docker Compose v2)
+  community.docker.docker_compose_v2:
+    project_src: "{{ nginx_rp_config_dir }}"
+    files:
+      - "{{ nginx_rp_docker_compose_path }}"
+    project_name: "{{ nginx_rp_project_name }}"
+    state: absent
+    remove_orphans: true
+  ignore_errors: true
+
+- name: Deploy or update Nginx reverse proxy stack (Docker Compose v2)
+  community.docker.docker_compose_v2:
+    project_src: "{{ nginx_rp_config_dir }}"
+    files:
+      - "{{ nginx_rp_docker_compose_path }}"
+    project_name: "{{ nginx_rp_project_name }}"
+    state: present
+    pull: missing
+  register: nginx_rp_compose_result
+
+- name: Show Nginx reverse proxy stack result
+  ansible.builtin.debug:
+    var: nginx_rp_compose_result

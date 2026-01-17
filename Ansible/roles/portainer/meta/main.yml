@@ -1,0 +1,9 @@
+---
+galaxy_info:
+  role_name: portainer
+  author: lab
+  description: Portainer CE (HTTP backend) for lab.local
+  min_ansible_version: "2.16"
+  license: MIT
+
+dependencies: []

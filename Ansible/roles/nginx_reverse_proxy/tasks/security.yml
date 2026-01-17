@@ -1,0 +1,35 @@
+---
+- name: Scan Nginx image with Trivy
+  community.docker.docker_container:
+    name: trivy-scan-nginx
+    image: aquasec/trivy:latest
+    command: "image --exit-code 1 --severity CRITICAL,HIGH {{ nginx_rp_image }}"
+    auto_remove: true
+  register: nginx_rp_trivy_result
+  tags: [security, scan]
+
+- name: Scan Nginx exporter image with Trivy
+  community.docker.docker_container:
+    name: trivy-scan-nginx-exporter
+    image: aquasec/trivy:latest
+    command: "image --exit-code 1 --severity CRITICAL,HIGH {{ nginx_rp_exporter_image }}"
+    auto_remove: true
+  register: nginx_rp_trivy_exporter_result
+  tags: [security, scan]
+
+- name: Ensure permissions on SSL private key
+  ansible.builtin.file:
+    path: "{{ nginx_rp_ssl_dir }}/wildcard.lab.local.key"
+    mode: "0600"
+    owner: root
+    group: root
+  tags: [security, hardening]
+
+- name: Configure UFW for Nginx reverse proxy
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: tcp
+    from_ip: "{{ item.allowed_ip }}"
+  loop: "{{ nginx_rp_firewall_rules }}"
+  tags: [security, firewall]

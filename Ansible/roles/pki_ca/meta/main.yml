@@ -1,0 +1,9 @@
+---
+galaxy_info:
+  role_name: pki_ca
+  author: lab
+  description: Local PKI CA for lab.local domain
+  min_ansible_version: "2.16"
+  license: MIT
+
+dependencies: []

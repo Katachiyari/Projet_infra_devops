@@ -1,0 +1,7 @@
+---
+- name: Test Portainer HTTP local
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host | default('172.16.100.2') }}:{{ portainer_http_port }}"
+    status_code: 200
+  register: portainer_http_test
+

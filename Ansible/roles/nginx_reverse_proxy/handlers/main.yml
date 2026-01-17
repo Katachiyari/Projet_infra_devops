@@ -1,0 +1,5 @@
+---
+- name: restart nginx reverse proxy stack
+  ansible.builtin.command:
+    cmd: "docker compose -f {{ nginx_rp_docker_compose_path }} -p {{ nginx_rp_project_name }} up -d"
+  changed_when: false

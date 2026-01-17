@@ -179,8 +179,8 @@
 │                                                             │
 │  2. Check zone locale (lab.local)                          │
 │     └─> /var/lib/bind/db.lab.local                         │
-│         ├─> harbor IN A 172.16.100.2 ✓ TROUVÉ              │
-│         └─> Réponse : 172.16.100.2                         │
+│         ├─> harbor IN A 172.16.100.253 ✓ TROUVÉ             │
+│         └─> Réponse : 172.16.100.253                        │
 │                                                             │
 │  3. Mise en cache (TTL 3600s)                              │
 │     └─> Prochaine requête servie depuis cache              │

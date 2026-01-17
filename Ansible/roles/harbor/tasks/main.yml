@@ -1,0 +1,18 @@
+---
+- name: Preconditions for Harbor
+  ansible.builtin.import_tasks: prerequisites.yml
+
+- name: Install Harbor dependencies and offline installer
+  ansible.builtin.import_tasks: install.yml
+
+- name: Configure Harbor configuration files
+  ansible.builtin.import_tasks: configure.yml
+
+- name: Deploy Harbor Docker stack
+  ansible.builtin.import_tasks: deploy.yml
+
+- name: Apply Harbor security hardening
+  ansible.builtin.import_tasks: security.yml
+
+- name: Validate Harbor deployment
+  ansible.builtin.import_tasks: validation.yml

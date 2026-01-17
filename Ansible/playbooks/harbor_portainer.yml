@@ -1,0 +1,11 @@
+---
+# Playbook Mission 2 - Harbor + Portainer (HTTP backends)
+
+- name: Deploy Harbor and Portainer on registry VM
+  hosts: harbor_portainer_hosts
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: harbor
+    - role: portainer

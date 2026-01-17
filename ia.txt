@@ -1,412 +1,1093 @@
-# 🤖 Prompt pour IA : Déploiement Stack Monitoring
-
-***
+# 🤖 Prompt IA - Déploiement Stack DevSecOps (Version HTTP/HTTPS)
 
 ```markdown
 # CONTEXTE PROJET
 
-Tu es un expert DevSecOps. Tu travailles sur un projet d'infrastructure Proxmox existant géré avec Terraform et Ansible.
+Tu es un expert DevSecOps spécialisé en automatisation d'infrastructure.
+Projet : Déploiement automatisé stack DevOps avec Ansible sur infrastructure Proxmox.
 
-## INFRASTRUCTURE EXISTANTE
+Stack technique :
+- Hyperviseur : Proxmox 9.1.1
+- IaC : Terraform (provisionnement VMs)
+- Configuration : Ansible (déploiement applications)
+- Containers : Docker + Docker Compose
+- Sécurité : Trivy (scan vulnérabilités)
 
-### VMs déjà déployées
-- `dns-server` (172.16.100.254) : Bind9 configuré
-- `harbor` (172.16.100.2) : Harbor Registry Docker
-- `tools-manager` (172.16.100.20) : Taiga + EdgeDoc
-- `gitlab` (172.16.100.30) : GitLab CE
+Architecture réseau :
+- Réseau production : 172.16.100.0/24
+- DNS interne : dns-server (172.16.100.254)
+- Domaine : lab.local
 
-### Architecture Terraform/Ansible en place
+# ARCHITECTURE SSL/TLS
+
+## ⚠️ RÈGLE CRITIQUE : HTTP Backend + HTTPS Frontend
+
 ```
-projet-infra-devops/
-├── terraform.tfvars          # SSOT VMs
-├── main.tf                   # Provisionnement Proxmox
-├── provider.tf
-├── variables.tf
-│
-└── Ansible/
-    ├── inventory/
-    │   └── terraform.generated.yml
-    │
-    ├── group_vars/
-    │   ├── all.yml           # Config globale
-    │   └── dns_hosts.yml     # Config Bind9
-    │
-    ├── roles/
-    │   ├── common/           # Docker, firewall, base
-    │   ├── bind9/            # DNS
-    │   ├── harbor/           # Registry
-    │   ├── taiga/            # Gestion projet
-    │   ├── edgedoc/          # Documentation
-    │   └── gitlab/           # Git + CI/CD
-    │
-    └── playbooks/
-        ├── site.yml
-        ├── bind9.yml
-        ├── harbor.yml
-        └── gitlab.yml
+┌────────────────────────────────────────────────────────────────┐
+│ Architecture SSL/TLS Complète                                  │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  Internet/Client                                               │
+│      │                                                         │
+│      │ HTTPS (port 443)                                        │
+│      │ TLS 1.2/1.3                                             │
+│      ▼                                                         │
+│  ┌─────────────────────────────────────────┐                  │
+│  │ Reverse Proxy Nginx (172.16.100.253)   │                  │
+│  │ - SSL Termination (déchiffrement)       │                  │
+│  │ - Certificat wildcard *.lab.local       │                  │
+│  │ - Headers sécurité (HSTS, CSP...)       │                  │
+│  └─────────────────────────────────────────┘                  │
+│      │                                                         │
+│      │ HTTP (port 80/443/custom)                               │
+│      │ Traffic interne non chiffré                            │
+│      ▼                                                         │
+│  ┌─────────────────────────────────────────┐                  │
+│  │ Services Backend (HTTP uniquement)      │                  │
+│  │ ├─ Harbor (172.16.100.50:80)           │                  │
+│  │ ├─ Portainer (172.16.100.50:9000)      │                  │
+│  │ ├─ GitLab (172.16.100.30:80)           │                  │
+│  │ ├─ Taiga (172.16.100.60:80)            │                  │
+│  │ └─ EdgeDoc (172.16.100.60:8080)        │                  │
+│  └─────────────────────────────────────────┘                  │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
 ```
 
-### Standards du projet (IMPÉRATIFS)
-- ✅ **Idempotence stricte** : tout doit être rejouable sans erreur
-- ✅ **SSOT** : une seule source de vérité par configuration
-- ✅ **Docker Compose officiel** : pas de containers standalone
-- ✅ **Documentation officielle uniquement** : Prometheus, Grafana, Alertmanager docs
-- ✅ **DevSecOps** : sécurité dès la conception (pas de root, secrets chiffrés, firewall)
-- ✅ **DNS intégré** : ajout automatique dans Bind9
-- ✅ **Progressif** : version simple d'abord, complexité ajoutée après validation
+## Autorité de Certification (CA) Locale
 
-### Outils disponibles
-- Proxmox VE 9.1.1
-- Terraform avec provider `bpg/proxmox`
-- Ansible 2.16+
-- Ubuntu 24.04 LTS (templates cloud-init)
-- Docker Engine + Docker Compose v2
-- Bind9 pour DNS interne (zone `lab.local`)
+**Tous certificats SSL auto-signés via CA locale.**
+
+### Hiérarchie CA
+
+```
+Root CA (lab-root-ca)
+  ├─ CN: Lab Root CA
+  ├─ Validité: 10 ans
+  ├─ Key: /opt/ca/root-ca.key (4096 bits RSA)
+  └─ Cert: /opt/ca/root-ca.crt
+      │
+      └─> Intermediate CA (lab-intermediate-ca) [optionnel]
+           │
+           └─> Certificats serveurs
+                ├─ *.lab.local (wildcard)
+                ├─ harbor.lab.local
+                ├─ gitlab.lab.local
+                └─ portainer.lab.local
+```
+
+### Déploiement CA
+
+**Créer CA Root + générer certificats wildcard.**
+
+```bash
+# 1. Créer CA Root
+openssl genrsa -out /opt/ca/root-ca.key 4096
+openssl req -x509 -new -nodes -key /opt/ca/root-ca.key \
+  -sha256 -days 3650 -out /opt/ca/root-ca.crt \
+  -subj "/C=FR/ST=IDF/L=Paris/O=Lab/CN=Lab Root CA"
+
+# 2. Générer certificat wildcard *.lab.local
+openssl genrsa -out /opt/ca/wildcard.lab.local.key 2048
+openssl req -new -key /opt/ca/wildcard.lab.local.key \
+  -out /opt/ca/wildcard.lab.local.csr \
+  -subj "/C=FR/ST=IDF/L=Paris/O=Lab/CN=*.lab.local"
+
+# 3. Signer avec CA Root
+cat > /opt/ca/wildcard.ext << 'EOF'
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = *.lab.local
+DNS.2 = lab.local
+EOF
+
+openssl x509 -req -in /opt/ca/wildcard.lab.local.csr \
+  -CA /opt/ca/root-ca.crt -CAkey /opt/ca/root-ca.key \
+  -CAcreateserial -out /opt/ca/wildcard.lab.local.crt \
+  -days 825 -sha256 -extfile /opt/ca/wildcard.ext
+
+# 4. Distribuer CA Root sur toutes VMs (trust)
+cp /opt/ca/root-ca.crt /usr/local/share/ca-certificates/lab-root-ca.crt
+update-ca-certificates
+
+# 5. Vérifier certificat
+openssl x509 -in /opt/ca/wildcard.lab.local.crt -text -noout
+```
+
+**Rôle Ansible dédié : `roles/pki_ca/`**
 
 ---
 
-# MISSION
+# RÈGLES STRICTES
 
-Créer une **nouvelle VM `monitoring-stack`** avec Prometheus + Grafana + Alertmanager sur une seule machine.
+## 1. SOURCES DOCUMENTATION
+✅ AUTORISÉ :
+- Documentation officielle uniquement (docs.docker.com, docs.ansible.com, docs.gitlab.com...)
+- GitHub repositories officiels des projets
+- Docker Hub images officielles
 
-## SPÉCIFICATIONS VM
+❌ INTERDIT :
+- Blogs tiers non vérifiés
+- Stack Overflow sans validation
+- Tutoriels communautaires non officiels
+- Sources obsolètes (> 2 ans)
+
+## 2. IMAGES DOCKER
+PRIORITÉ ABSOLUE :
+1. Images officielles Docker Hub (nginx, postgres, redis...)
+2. Images éditeurs officiels (goharbor/*, gitlab/*, portainer/*)
+3. Images vérifiées (badge "Docker Official Image")
+
+❌ INTERDIT :
+- Images custom non maintenues
+- Images sans versioning
+- Images "latest" en production (toujours tag version)
+
+Format imposé :
+```yaml
+services:
+  app:
+    image: nginx:1.25-alpine  # ✅ Version + variant
+    # ❌ PAS : image: nginx:latest
+```
+
+## 3. SÉCURITÉ DevSecOps
+
+### Shift-Left Security (intégrer dès le début)
+
+**Obligatoire dans TOUS les rôles Ansible :**
 
 ```yaml
-monitoring-stack:
-  ip: 172.16.100.40
-  hostname: monitoring.lab.local
-  cpu: 2
-  ram: 4096 MB
-  disk: 50 GB
-  bridge: vmbr0
-  pool: production
-  tags: [monitoring, observability, prod]
+# tasks/security.yml (dans chaque rôle)
+***
+- name: Scan vulnérabilités image Docker avec Trivy
+  community.docker.docker_container:
+    name: trivy-scan
+    image: aquasec/trivy:latest
+    command: "image --exit-code 1 --severity CRITICAL,HIGH {{ image_name }}"
+  register: trivy_result
+  failed_when: trivy_result.rc != 0
+  tags: ['security', 'scan']
+
+- name: Vérifier permissions fichiers sensibles
+  ansible.builtin.file:
+    path: "{{ item }}"
+    mode: '0600'
+    owner: root
+    group: root
+  loop:
+    - /opt/{{ app_name }}/config/secrets.env
+    - /opt/{{ app_name }}/ssl/private.key
+  tags: ['security', 'hardening']
+
+- name: Configurer firewall UFW
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: tcp
+    from_ip: "{{ item.allowed_ip }}"
+  loop: "{{ firewall_rules }}"
+  tags: ['security', 'firewall']
 ```
 
-## SERVICES À DÉPLOYER (Stack unique)
+**Scan obligatoire avant déploiement :**
+- Trivy scan images Docker (CRITICAL + HIGH = FAIL)
+- Scan secrets hardcodés (git-secrets, trivy repo)
+- SAST Python/Bash scripts (Semgrep, Bandit)
+- Vérification permissions fichiers (no 777, no world-readable secrets)
 
-### 1. Prometheus
-- **Version** : Latest stable (v2.48+)
-- **Port** : 9090
-- **Rôle** : Collecte métriques (scraping)
-- **Targets** : 
-  - Node Exporter (toutes VMs)
-  - cAdvisor (Docker containers)
-  - Harbor metrics (si activé)
-  - GitLab metrics (si activé)
-- **Rétention** : 15 jours
-- **Storage** : `/data/prometheus`
+## 4. AUTOMATISATION
 
-### 2. Grafana
-- **Version** : Latest stable (v10.2+)
-- **Port** : 3000
-- **Rôle** : Visualisation dashboards
-- **Datasource** : Prometheus (auto-configuré)
-- **Dashboards** : Import automatique (Node Exporter, Docker)
-- **Auth** : Admin password (Ansible Vault)
-- **Storage** : `/data/grafana`
+### Scripts Bash
 
-### 3. Alertmanager
-- **Version** : Latest stable (v0.26+)
-- **Port** : 9093
-- **Rôle** : Gestion alertes
-- **Notifications** : Email (SMTP) + webhook (optionnel)
-- **Storage** : `/data/alertmanager`
+**Template standard :**
+```bash
+#!/usr/bin/env bash
+# ===================================================================
+# Script : deploy_{{ app_name }}.sh (généré par Ansible)
+# Description : Déploiement automatisé {{ app_name }}
+# Idempotent : ✅ Oui (réexécutable sans effet de bord)
+# ===================================================================
 
-### 4. Node Exporter (sur TOUTES les VMs)
-- **Version** : Latest stable
-- **Port** : 9100
-- **Rôle** : Métriques système (CPU, RAM, disk, network)
-- **Déploiement** : Systemd service (pas Docker pour éviter dépendance)
+set -euo pipefail  # Exit on error, undefined var, pipe fail
+IFS=$'\n\t'        # Safe word splitting
 
----
+# ===================================================================
+# Configuration
+# ===================================================================
+readonly APP_NAME="{{ app_name }}"
+readonly INSTALL_DIR="/opt/${APP_NAME}"
+readonly COMPOSE_FILE="${INSTALL_DIR}/docker-compose.yml"
+readonly LOG_FILE="/var/log/${APP_NAME}-deploy.log"
 
-# LIVRABLES ATTENDUS
+# ===================================================================
+# Fonctions
+# ===================================================================
+log() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" | tee -a "${LOG_FILE}"
+}
 
-## 1. Terraform
+check_prerequisites() {
+    log "Vérification prérequis..."
+    command -v docker >/dev/null 2>&1 || { log "ERROR: Docker non installé"; exit 1; }
+    command -v docker-compose >/dev/null 2>&1 || { log "ERROR: Docker Compose non installé"; exit 1; }
+}
 
-### Fichier `terraform.tfvars` (ajout VM)
-Ajouter l'entrée `monitoring-stack` dans le map `nodes` existant.
+# ===================================================================
+# Main (idempotent)
+# ===================================================================
+main() {
+    check_prerequisites
+    
+    # Check si déjà déployé (idempotence)
+    if docker ps -a --format '{{.Names}}' | grep -q "^${APP_NAME}$"; then
+        log "⚠️  ${APP_NAME} déjà déployé. Mise à jour..."
+        cd "${INSTALL_DIR}" && docker-compose up -d --no-deps --build
+    else
+        log "🚀 Déploiement initial ${APP_NAME}..."
+        cd "${INSTALL_DIR}" && docker-compose up -d
+    fi
+    
+    log "✅ Déploiement ${APP_NAME} terminé"
+}
 
-### Pas de modification des autres fichiers Terraform
-La structure existante doit fonctionner sans changement.
-
----
-
-## 2. Ansible
-
-### A. Rôle `monitoring` (NOUVEAU)
-
-**Structure** :
+main "$@"
 ```
-roles/monitoring/
-├── defaults/main.yml       # Variables par défaut
+
+### Rôles Ansible
+
+**Structure OBLIGATOIRE :**
+```
+roles/{{ app_name }}/
+├── defaults/
+│   └── main.yml          # Variables par défaut
 ├── tasks/
-│   ├── main.yml           # Orchestration
-│   ├── prerequisites.yml   # Docker, dirs, firewall
-│   ├── prometheus.yml      # Config Prometheus
-│   ├── grafana.yml         # Config Grafana
-│   └── alertmanager.yml    # Config Alertmanager
+│   ├── main.yml          # Entry point (include autres tasks)
+│   ├── prerequisites.yml # Checks prérequis
+│   ├── install.yml       # Installation packages
+│   ├── configure.yml     # Configuration app
+│   ├── deploy.yml        # Déploiement Docker Compose
+│   ├── security.yml      # Hardening sécurité
+│   └── validation.yml    # Tests post-déploiement
 ├── templates/
 │   ├── docker-compose.yml.j2
-│   ├── prometheus.yml.j2
-│   ├── alertmanager.yml.j2
-│   ├── grafana-datasources.yml.j2
-│   └── alert-rules.yml.j2
-├── handlers/main.yml       # Restart services
-└── files/
-    └── dashboards/         # Dashboards JSON Grafana
-        ├── node-exporter.json
-        └── docker-containers.json
+│   ├── config.yml.j2
+│   └── nginx.conf.j2
+├── handlers/
+│   └── main.yml          # Restart services
+├── files/
+│   └── scripts/
+└── meta/
+    └── main.yml          # Dépendances rôle
 ```
 
-**Fonctionnalités** :
-- Installation Docker Compose stack (idempotent)
-- Configuration Prometheus avec auto-discovery des targets depuis inventaire Ansible
-- Configuration Grafana avec datasource Prometheus
-- Import automatique dashboards Grafana
-- Configuration Alertmanager avec règles de base
-- Firewall UFW (ports 9090, 3000, 9093)
-- Backup automatique `/data/monitoring` (optionnel)
+## 5. IDEMPOTENCE RIGOUREUSE
 
-### B. Rôle `node_exporter` (NOUVEAU)
-
-**Structure** :
-```
-roles/node_exporter/
-├── defaults/main.yml
-├── tasks/main.yml
-├── templates/
-│   └── node_exporter.service.j2
-└── handlers/main.yml
-```
-
-**Fonctionnalités** :
-- Installation Node Exporter (binaire officiel)
-- Service systemd
-- Firewall (port 9100 depuis monitoring-stack uniquement)
-- Idempotent
-
-### C. Fichier `group_vars/monitoring_hosts.yml` (NOUVEAU)
-
-Variables SSOT pour la stack monitoring :
-```yaml
-# Versions (sources officielles)
-prometheus_version: "v2.48.0"
-grafana_version: "10.2.3"
-alertmanager_version: "v0.26.0"
-node_exporter_version: "1.7.0"
-
-# Réseau
-monitoring_hostname: "monitoring.lab.local"
-
-# Stockage
-monitoring_data_volume: "/data/monitoring"
-
-# Prometheus
-prometheus_port: 9090
-prometheus_retention_days: 15
-prometheus_scrape_interval: "15s"
-
-# Auto-discovery targets depuis inventaire
-prometheus_targets:
-  - job_name: node-exporter
-    static_configs:
-      - targets: # AUTO-GÉNÉRÉ depuis groups['all']
-
-# Grafana
-grafana_port: 3000
-grafana_admin_user: admin
-grafana_admin_password: "{{ vault_grafana_admin_password }}"
-
-# Alertmanager
-alertmanager_port: 9093
-alertmanager_smtp_host: "smtp.lab.local"
-alertmanager_smtp_from: "alertmanager@lab.local"
-alertmanager_smtp_to: "admin@lab.local"
-```
-
-### D. Fichier `secrets/monitoring.vault` (NOUVEAU)
-
-Secrets chiffrés Ansible Vault :
-```yaml
-vault_grafana_admin_password: "Graf@naAdm!n2024"
-vault_alertmanager_smtp_password: "SmtpP@ss2024"
-```
-
-### E. Playbook `playbooks/monitoring.yml` (NOUVEAU)
+### Checks OBLIGATOIRES avant toute action
 
 ```yaml
-***
-- name: Déploiement Stack Monitoring
-  hosts: monitoring_hosts
-  become: true
+# ✅ BON (idempotent)
+- name: Créer répertoire /opt/harbor
+  ansible.builtin.file:
+    path: /opt/harbor
+    state: directory
+    mode: '0755'
+  # Rejouable : si existe déjà, aucun changement
+
+# ❌ MAUVAIS (non idempotent)
+- name: Créer répertoire
+  ansible.builtin.shell: mkdir /opt/harbor
+  # Échoue si déjà existe
+
+# ✅ BON (check avant)
+- name: Vérifier si Harbor déjà installé
+  ansible.builtin.stat:
+    path: /opt/harbor/harbor.yml
+  register: harbor_installed
+
+- name: Télécharger Harbor
+  ansible.builtin.get_url:
+    url: https://github.com/goharbor/harbor/releases/download/v2.10.0/harbor-offline-installer-v2.10.0.tgz
+    dest: /tmp/harbor.tgz
+  when: not harbor_installed.stat.exists
+
+# ✅ BON (Docker Compose idempotent)
+- name: Démarrer stack Docker Compose
+  community.docker.docker_compose:
+    project_src: /opt/harbor
+    state: present  # ✅ Idempotent (create if not exists, update if changed)
+  # ❌ PAS state: restarted (force restart même si pas changement)
+```
+
+### État désiré (declarative)
+
+```yaml
+# ✅ Declarative (état désiré)
+- name: Service Docker actif
+  ansible.builtin.systemd:
+    name: docker
+    state: started    # Démarre SI arrêté (idempotent)
+    enabled: true     # Active au boot SI pas activé
+
+# ❌ Impératif (commandes)
+- name: Démarrer Docker
+  ansible.builtin.shell: systemctl start docker
+  # Toujours executed, même si déjà started
+```
+
+## 6. ANTI-PATTERNS
+
+### ❌ NE JAMAIS FAIRE
+
+```yaml
+# ❌ Répéter même commande
+- name: Update apt
+  apt: update_cache=yes
   
-  roles:
-    - common              # Prérequis (Docker)
-    - monitoring          # Stack complète
-
-- name: Installation Node Exporter (toutes VMs)
-  hosts: all
-  become: true
+- name: Install package 1
+  apt: name=nginx
   
-  roles:
-    - node_exporter
+- name: Update apt again  # ❌ INUTILE
+  apt: update_cache=yes
+
+- name: Install package 2
+  apt: name=docker.io
+
+# ✅ BON (une seule fois)
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600  # Cache 1h
+
+- name: Install packages
+  apt:
+    name:
+      - nginx
+      - docker.io
+    state: present
 ```
 
----
-
-## 3. DNS (Bind9)
-
-### Modification `group_vars/dns_hosts.yml`
-
-Ajouter les enregistrements DNS :
 ```yaml
-bind9_zones:
-  - name: "lab.local"
-    records:
-      # ... (enregistrements existants)
-      
-      # Monitoring Stack
-      - name: "monitoring"
-        type: A
-        value: "172.16.100.40"
-      
-      - name: "grafana"
-        type: CNAME
-        value: "monitoring.lab.local."
-      
-      - name: "prometheus"
-        type: CNAME
-        value: "monitoring.lab.local."
-      
-      - name: "alertmanager"
-        type: CNAME
-        value: "monitoring.lab.local."
+# ❌ Boucle aveugle (retry sans diagnostic)
+- name: Start service
+  systemd:
+    name: myapp
+    state: started
+  retries: 10  # ❌ Retry sans comprendre pourquoi ça fail
+  delay: 5
+
+# ✅ BON (diagnostic root cause)
+- name: Check service dependencies
+  systemd:
+    name: "{{ item }}"
+    state: started
+  loop:
+    - docker
+    - postgresql
+  register: deps_status
+
+- name: Fail si dependencies KO
+  fail:
+    msg: "Service {{ item.item }} not started. Check logs: journalctl -u {{ item.item }}"
+  when: item.failed
+  loop: "{{ deps_status.results }}"
+
+- name: Start service (après validation deps)
+  systemd:
+    name: myapp
+    state: started
 ```
 
----
-
-## 4. Documentation
-
-### Fichier `docs/monitoring-stack.md` (NOUVEAU)
-
-Documentation complète :
-- Architecture de la stack
-- Configuration Prometheus (targets, rules)
-- Dashboards Grafana disponibles
-- Configuration alertes
-- Commandes maintenance (backup, restore)
-- Troubleshooting
-
----
-
-# CONTRAINTES TECHNIQUES
-
-## Sécurité DevSecOps
-- ❌ Pas de `latest` tag Docker (versions explicites)
-- ✅ Utilisateurs non-root dans containers
-- ✅ Secrets dans Ansible Vault uniquement
-- ✅ Firewall UFW strict (ports minimum)
-- ✅ HTTPS pour Grafana (certificat auto-signé ou Let's Encrypt)
-- ✅ Authentification activée (pas d'accès anonyme)
-
-## Idempotence
-- Tous les tasks Ansible doivent être rejouables sans erreur
-- Utiliser modules Ansible (`docker_compose`, `template`, `file`) pas `shell`
-- Handlers pour restart services uniquement si config change
-
-## Performance
-- Prometheus : scrape interval 15s (pas moins)
-- Rétention 15 jours maximum (petit lab)
-- Grafana : pas de plugins externes (version de base)
-
-## Intégration inventaire Ansible
-- Auto-discovery targets Prometheus depuis `groups['all']`
-- Pas de hardcoding d'IPs (utiliser `hostvars`)
-
----
-
-# COMMANDES DE DÉPLOIEMENT ATTENDUES
+### Diagnostic avant retry
 
 ```bash
-# 1. Créer VM
-terraform apply -target=proxmox_virtual_environment_vm.vm[\"monitoring-stack\"]
+# ❌ Boucle infinie
+while ! docker ps; do
+    docker restart myapp  # Retry aveugle
+    sleep 5
+done
 
-# Attendre cloud-init
-sleep 60
+# ✅ Diagnostic root cause
+if ! docker ps &>/dev/null; then
+    echo "ERROR: Docker daemon not running"
+    systemctl status docker
+    journalctl -u docker -n 50
+    exit 1
+fi
 
-# 2. Déployer stack monitoring
-cd Ansible/
-ansible-playbook playbooks/monitoring.yml --ask-vault-pass
-
-# 3. Installer Node Exporter partout
-ansible-playbook playbooks/monitoring.yml --tags node_exporter
-
-# 4. Mettre à jour DNS
-ansible-playbook playbooks/bind9.yml
-
-# 5. Valider
-curl http://monitoring.lab.local:9090/targets       # Prometheus targets
-curl http://grafana.lab.local:3000/api/health      # Grafana health
+if ! docker ps -a | grep -q myapp; then
+    echo "ERROR: Container myapp not exists"
+    docker ps -a
+    docker logs myapp 2>&1 | tail -50
+    exit 1
+fi
 ```
 
 ---
 
-# VALIDATION FINALE
+# MISSIONS (ORDRE D'EXÉCUTION)
 
-## Tests de fonctionnement
-- [ ] Prometheus UI accessible : `http://monitoring.lab.local:9090`
-- [ ] Prometheus scrape toutes les VMs (Node Exporter)
-- [ ] Grafana UI accessible : `http://grafana.lab.local:3000`
-- [ ] Login Grafana avec admin password
-- [ ] Datasource Prometheus configuré automatiquement
-- [ ] Dashboards importés visibles
-- [ ] Alertmanager UI accessible : `http://monitoring.lab.local:9093`
-- [ ] Résolution DNS : `dig monitoring.lab.local @172.16.100.254`
-- [ ] Firewall : ports 9090, 3000, 9093 ouverts uniquement
+## ⚠️ ORDRE OBLIGATOIRE : Reverse Proxy AVANT services backend
 
-## Tests idempotence
-```bash
-# Rejouer sans erreur
-ansible-playbook playbooks/monitoring.yml --ask-vault-pass
-# → 0 changed, 0 failed
+```
+1. PKI CA (génération certificats)
+2. Reverse Proxy Nginx (SSL termination)
+3. Harbor + Portainer
+4. GitLab
+5. Taiga + EdgeDoc
 ```
 
 ---
 
-# FORMAT DE RÉPONSE ATTENDU
+## MISSION 0 : PKI CA (Autorité Certification)
 
-Fournis le code complet des fichiers suivants dans l'ordre :
+**Objectif :** Créer CA Root + générer certificats SSL auto-signés.
 
-1. **terraform.tfvars** (extrait ajout VM)
-2. **group_vars/monitoring_hosts.yml** (complet)
-3. **secrets/monitoring.vault** (complet)
-4. **roles/monitoring/defaults/main.yml** (complet)
-5. **roles/monitoring/tasks/main.yml** (complet)
-6. **roles/monitoring/templates/docker-compose.yml.j2** (complet)
-7. **roles/monitoring/templates/prometheus.yml.j2** (complet)
-8. **roles/monitoring/templates/alertmanager.yml.j2** (complet)
-9. **roles/monitoring/templates/grafana-datasources.yml.j2** (complet)
-10. **roles/node_exporter/tasks/main.yml** (complet)
-11. **roles/node_exporter/templates/node_exporter.service.j2** (complet)
-12. **playbooks/monitoring.yml** (complet)
-13. **group_vars/dns_hosts.yml** (extrait ajout DNS)
-14. **docs/monitoring-stack.md** (complet)
+**Livrables attendus :**
 
-Pour chaque fichier :
-- Chemin complet
-- Rôle (SSOT ou non)
-- Code complet avec commentaires explicatifs
-- Aucun placeholder (`...`, `# TODO`, etc.)
+1. **Rôle Ansible : `roles/pki_ca/`**
+   - Génération CA Root (lab-root-ca.crt/key)
+   - Génération certificat wildcard *.lab.local
+   - Génération certificats spécifiques (harbor, gitlab...)
+   - Distribution CA Root sur toutes VMs (trust)
+   - Scripts renouvellement certificats
 
-Utilise UNIQUEMENT les documentations officielles :
-- https://prometheus.io/docs/prometheus/latest/
-- https://grafana.com/docs/grafana/latest/
-- https://prometheus.io/docs/alerting/latest/alertmanager/
+**Contraintes :**
+- CA Root validité : 10 ans
+- Certificats serveurs validité : 825 jours (policy Apple/Google)
+- Clés RSA 4096 bits (CA) / 2048 bits (serveurs)
+- Stockage sécurisé : `/opt/ca/` (permissions 0600)
+- Backup CA Root : `/backup/ca/`
 
-Commence maintenant.
+**Structure générée :**
+```
+/opt/ca/
+├── root-ca.key          # Clé privée CA (4096 bits) - SENSIBLE
+├── root-ca.crt          # Certificat CA Root (public)
+├── wildcard.lab.local.key
+├── wildcard.lab.local.crt
+├── harbor.lab.local.key
+├── harbor.lab.local.crt
+├── gitlab.lab.local.key
+├── gitlab.lab.local.crt
+└── certs/
+    └── README.md
+```
+
+**Tests validation :**
+```yaml
+- name: Vérifier CA Root installé
+  ansible.builtin.stat:
+    path: /usr/local/share/ca-certificates/lab-root-ca.crt
+  register: ca_installed
+  failed_when: not ca_installed.stat.exists
+
+- name: Vérifier certificat wildcard valide
+  ansible.builtin.command: >
+    openssl verify -CAfile /opt/ca/root-ca.crt /opt/ca/wildcard.lab.local.crt
+  register: cert_verify
+  failed_when: cert_verify.rc != 0
+
+- name: Tester connexion HTTPS avec certificat
+  ansible.builtin.uri:
+    url: https://harbor.lab.local
+    validate_certs: yes  # ✅ Doit passer (CA trust)
+    status_code: 200
+```
+
+---
+
+## MISSION 1 : Nginx Reverse Proxy (172.16.100.253)
+
+**Objectif :** Déployer Nginx reverse proxy avec SSL termination.
+
+**Livrables attendus :**
+
+1. **Rôle Ansible : `roles/nginx_reverse_proxy/`**
+   - Nginx 1.25-alpine (image officielle)
+   - Docker Compose standalone
+   - Configuration reverse proxy pour TOUS services :
+     - harbor.lab.local → http://172.16.100.50:80
+     - portainer.lab.local → http://172.16.100.50:9000
+     - gitlab.lab.local → http://172.16.100.30:80
+     - registry.gitlab.lab.local → http://172.16.100.30:5050
+     - taiga.lab.local → http://172.16.100.60:80
+     - edgedoc.lab.local → http://172.16.100.60:8080
+   - SSL/TLS termination (certificats CA locale)
+   - Headers sécurité (HSTS, CSP, X-Frame-Options, X-XSS-Protection)
+   - Rate limiting (10 req/s par IP)
+   - Logs access/error (format JSON)
+   - Monitoring Prometheus (nginx-prometheus-exporter)
+
+**Contraintes :**
+- Nginx port 80 (redirect → 443)
+- Nginx port 443 (HTTPS)
+- Certificat wildcard *.lab.local (depuis /opt/ca/)
+- Backend HTTP uniquement (pas de SSL backend)
+- Timeout backend : 300s (5 min)
+- Max body size : 1 GB (upload images Docker)
+- Volumes persistants `/data/nginx/`
+- Firewall UFW : autoriser 80, 443 depuis 0.0.0.0/0
+
+**Template Nginx complet :**
+```nginx
+# templates/nginx.conf.j2
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log warn;
+pid /var/run/nginx.pid;
+
+events {
+    worker_connections 4096;
+    use epoll;
+    multi_accept on;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    # Logs format JSON
+    log_format json_combined escape=json
+        '{'
+        '"time_local":"$time_local",'
+        '"remote_addr":"$remote_addr",'
+        '"request":"$request",'
+        '"status":$status,'
+        '"body_bytes_sent":$body_bytes_sent,'
+        '"request_time":$request_time,'
+        '"upstream_response_time":"$upstream_response_time",'
+        '"http_user_agent":"$http_user_agent"'
+        '}';
+
+    access_log /var/log/nginx/access.log json_combined;
+
+    # Performance
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    client_max_body_size 1024M;  # 1 GB (push images Docker)
+
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css text/xml text/javascript 
+               application/json application/javascript application/xml+rss;
+
+    # Rate limiting zones
+    limit_req_zone $binary_remote_addr zone=general_limit:10m rate=10r/s;
+    limit_req_zone $binary_remote_addr zone=api_limit:10m rate=50r/s;
+    limit_conn_zone $binary_remote_addr zone=conn_limit:10m;
+
+    # SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384';
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    # Security headers (appliqués globalement)
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Upstream backends
+    upstream harbor_backend {
+      server 172.16.100.50:80 max_fails=3 fail_timeout=30s;
+    }
+
+    upstream portainer_backend {
+      server 172.16.100.50:9000 max_fails=3 fail_timeout=30s;
+    }
+
+    upstream gitlab_backend {
+        server 172.16.100.30:80 max_fails=3 fail_timeout=30s;
+    }
+
+    upstream gitlab_registry_backend {
+        server 172.16.100.30:5050 max_fails=3 fail_timeout=30s;
+    }
+
+    upstream taiga_backend {
+        server 172.16.100.60:80 max_fails=3 fail_timeout=30s;
+    }
+
+    upstream edgedoc_backend {
+        server 172.16.100.60:8080 max_fails=3 fail_timeout=30s;
+    }
+
+    # ===================================================================
+    # Harbor (registry Docker)
+    # ===================================================================
+    server {
+        listen 80;
+        server_name harbor.lab.local;
+        return 301 https://$server_name$request_uri;
+    }
+
+    server {
+        listen 443 ssl http2;
+        server_name harbor.lab.local;
+
+        ssl_certificate /etc/nginx/ssl/wildcard.lab.local.crt;
+        ssl_certificate_key /etc/nginx/ssl/wildcard.lab.local.key;
+
+        # Rate limiting
+        limit_req zone=general_limit burst=20 nodelay;
+        limit_conn conn_limit 10;
+
+        # Proxy settings
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_request_buffering off;
+
+        # Timeouts (upload images volumineux)
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+
+        location / {
+            proxy_pass http://harbor_backend;
+        }
+
+        # WebSocket support (Harbor UI)
+        location /api/v2.0/events {
+            proxy_pass http://harbor_backend;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+        }
+    }
+
+    # ===================================================================
+    # Portainer (Docker management)
+    # ===================================================================
+    server {
+        listen 80;
+        server_name portainer.lab.local;
+        return 301 https://$server_name$request_uri;
+    }
+
+    server {
+        listen 443 ssl http2;
+        server_name portainer.lab.local;
+
+        ssl_certificate /etc/nginx/ssl/wildcard.lab.local.crt;
+        ssl_certificate_key /etc/nginx/ssl/wildcard.lab.local.key;
+
+        limit_req zone=general_limit burst=20 nodelay;
+
+        location / {
+            proxy_pass http://portainer_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # WebSocket support (Portainer UI)
+        location /api/websocket/ {
+            proxy_pass http://portainer_backend;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+        }
+    }
+
+    # ===================================================================
+    # GitLab
+    # ===================================================================
+    server {
+        listen 80;
+        server_name gitlab.lab.local;
+        return 301 https://$server_name$request_uri;
+    }
+
+    server {
+        listen 443 ssl http2;
+        server_name gitlab.lab.local;
+
+        ssl_certificate /etc/nginx/ssl/wildcard.lab.local.crt;
+        ssl_certificate_key /etc/nginx/ssl/wildcard.lab.local.key;
+
+        limit_req zone=api_limit burst=50 nodelay;
+
+        location / {
+            proxy_pass http://gitlab_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_read_timeout 300s;
+        }
+
+        # Git clone/push (pas de rate limiting)
+        location ~ ^/([\w\-\.]+)/([\w\-\.]+)\.git/ {
+            limit_req off;
+            proxy_pass http://gitlab_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_read_timeout 600s;
+        }
+    }
+
+    # ===================================================================
+    # GitLab Container Registry
+    # ===================================================================
+    server {
+        listen 80;
+        server_name registry.gitlab.lab.local;
+        return 301 https://$server_name$request_uri;
+    }
+
+    server {
+        listen 443 ssl http2;
+        server_name registry.gitlab.lab.local;
+
+        ssl_certificate /etc/nginx/ssl/wildcard.lab.local.crt;
+        ssl_certificate_key /etc/nginx/ssl/wildcard.lab.local.key;
+
+        # Pas de rate limiting (push/pull images)
+        limit_req off;
+        client_max_body_size 0;  # Unlimited (images Docker volumineuses)
+
+        location / {
+            proxy_pass http://gitlab_registry_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_read_timeout 900s;
+        }
+    }
+
+    # ===================================================================
+    # Taiga (project management)
+    # ===================================================================
+    server {
+        listen 80;
+        server_name taiga.lab.local;
+        return 301 https://$server_name$request_uri;
+    }
+
+    server {
+        listen 443 ssl http2;
+        server_name taiga.lab.local;
+
+        ssl_certificate /etc/nginx/ssl/wildcard.lab.local.crt;
+        ssl_certificate_key /etc/nginx/ssl/wildcard.lab.local.key;
+
+        limit_req zone=api_limit burst=30 nodelay;
+
+        location / {
+            proxy_pass http://taiga_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # WebSocket support (Taiga events)
+        location /events {
+            proxy_pass http://taiga_backend;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+        }
+    }
+
+    # ===================================================================
+    # EdgeDoc (documentation)
+    # ===================================================================
+    server {
+        listen 80;
+        server_name edgedoc.lab.local;
+        return 301 https://$server_name$request_uri;
+    }
+
+    server {
+        listen 443 ssl http2;
+        server_name edgedoc.lab.local;
+
+        ssl_certificate /etc/nginx/ssl/wildcard.lab.local.crt;
+        ssl_certificate_key /etc/nginx/ssl/wildcard.lab.local.key;
+
+        limit_req zone=general_limit burst=20 nodelay;
+
+        location / {
+            proxy_pass http://edgedoc_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+
+    # ===================================================================
+    # Monitoring Prometheus (metrics Nginx)
+    # ===================================================================
+    server {
+        listen 9113;
+        server_name _;
+
+        location /metrics {
+            stub_status on;
+            access_log off;
+            allow 172.16.100.0/24;
+            deny all;
+        }
+    }
+
+    # ===================================================================
+    # Health check
+    # ===================================================================
+    server {
+        listen 8080;
+        server_name _;
+
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+    }
+}
+```
+
+**Tests validation :**
+```yaml
+- name: Test résolution DNS
+  ansible.builtin.shell: dig +short {{ item }}.lab.local
+  loop:
+    - harbor
+    - gitlab
+    - portainer
+    - taiga
+    - edgedoc
+  register: dns_test
+  failed_when: "'172.16.100.253' not in dns_test.stdout"
+
+- name: Test redirect HTTP → HTTPS
+  ansible.builtin.uri:
+    url: http://harbor.lab.local
+    follow_redirects: none
+    status_code: 301
+  register: redirect_test
+
+- name: Test certificat SSL valide
+  ansible.builtin.command: >
+    openssl s_client -connect harbor.lab.local:443 -CAfile /opt/ca/root-ca.crt
+  register: ssl_test
+  failed_when: "'Verify return code: 0 (ok)' not in ssl_test.stdout"
+
+- name: Test headers sécurité
+  ansible.builtin.uri:
+    url: https://harbor.lab.local
+    return_content: yes
+  register: headers_test
+  failed_when: >
+    'Strict-Transport-Security' not in headers_test.headers or
+    'X-Frame-Options' not in headers_test.headers
+```
+
+---
+
+## MISSION 2 : Harbor + Portainer (172.16.100.50)
+
+**Objectif :** Déployer Harbor + Portainer (backend HTTP uniquement).
+
+**Livrables attendus :**
+
+1. **Rôle Ansible : `roles/harbor/`**
+   - Harbor v2.11.1 (dernière stable)
+   - Docker Compose HTTP uniquement (port 80)
+   - Trivy adapter intégré
+   - Configuration `external_url: https://harbor.lab.local` (frontend HTTPS)
+   - `harbor.yml` : `external_url` pointe vers reverse proxy
+
+2. **Rôle Ansible : `roles/portainer/`**
+   - Portainer CE v2.19.4
+   - Docker Compose HTTP uniquement (port 9000)
+   - Connexion Docker socket local
+
+**Contraintes :**
+- Harbor port 80 (HTTP, reverse proxy fait HTTPS)
+- Portainer port 9000 (HTTP)
+- Harbor `external_url: https://harbor.lab.local` (URL publique)
+- Volumes persistants `/data/harbor` et `/data/portainer`
+- Firewall UFW : autoriser 80, 9000 depuis 172.16.100.253 uniquement
+
+**Tests validation :**
+```yaml
+- name: Test Harbor HTTP local
+  ansible.builtin.uri:
+    url: http://172.16.100.50:80/api/v2.0/health
+    status_code: 200
+
+- name: Test Harbor via reverse proxy HTTPS
+  ansible.builtin.uri:
+    url: https://harbor.lab.local/api/v2.0/health
+    validate_certs: yes
+    status_code: 200
+
+- name: Test push image Harbor
+  ansible.builtin.shell: |
+    docker login -u admin -p {{ harbor_password }} harbor.lab.local
+    docker pull nginx:alpine
+    docker tag nginx:alpine harbor.lab.local/library/nginx:alpine
+    docker push harbor.lab.local/library/nginx:alpine
+  register: push_test
+  failed_when: push_test.rc != 0
+```
+
+---
+
+## MISSION 3 : GitLab (172.16.100.30)
+
+**Objectif :** Déployer GitLab CE (backend HTTP).
+
+**Livrables attendus :**
+
+1. **Rôle Ansible : `roles/gitlab/`**
+   - GitLab CE v16.8.0 (Docker Compose)
+   - Services HTTP : gitlab-web (port 80), registry (port 5050)
+   - `external_url: https://gitlab.lab.local`
+   - `registry_external_url: https://registry.gitlab.lab.local`
+   - GitLab Runner intégré (executor Docker)
+
+**Contraintes :**
+- GitLab port 80 (HTTP)
+- Registry port 5050 (HTTP)
+- Volumes persistants `/data/gitlab/`
+- Firewall UFW : autoriser 80, 5050 depuis 172.16.100.253
+
+**Tests validation :**
+```yaml
+- name: Test GitLab HTTP local
+  ansible.builtin.uri:
+    url: http://172.16.100.30:80/api/v4/version
+    status_code: 200
+
+- name: Test GitLab via reverse proxy HTTPS
+  ansible.builtin.uri:
+    url: https://gitlab.lab.local/api/v4/version
+    validate_certs: yes
+    status_code: 200
+
+- name: Test Runner enregistré
+  ansible.builtin.shell: gitlab-runner list
+  register: runner_list
+  failed_when: "'docker-runner' not in runner_list.stdout"
+```
+
+---
+
+## MISSION 4 : Taiga + EdgeDoc (172.16.100.60)
+
+**Objectif :** Déployer Taiga + EdgeDoc (backend HTTP).
+
+**Livrables attendus :**
+
+1. **Rôle Ansible : `roles/taiga/`**
+   - Taiga v6.7.0 (Docker Compose HTTP port 80)
+   - `TAIGA_SITES_SCHEME: https` (frontend HTTPS)
+   - `TAIGA_SITES_DOMAIN: taiga.lab.local`
+
+2. **Rôle Ansible : `roles/edgedoc/`**
+   - EdgeDoc (Docker Compose HTTP port 8080)
+
+**Contraintes :**
+- Taiga port 80 (HTTP)
+- EdgeDoc port 8080 (HTTP)
+- Volumes persistants `/data/taiga` et `/data/edgedoc`
+- Firewall UFW : autoriser 80, 8080 depuis 172.16.100.253
+
+**Tests validation :**
+```yaml
+- name: Test Taiga HTTP local
+  ansible.builtin.uri:
+    url: http://172.16.100.60:80/api/v1/
+    status_code: 200
+
+- name: Test Taiga via reverse proxy HTTPS
+  ansible.builtin.uri:
+    url: https://taiga.lab.local/api/v1/
+    validate_certs: yes
+    status_code: 200
+
+- name: Test EdgeDoc HTTP local
+  ansible.builtin.uri:
+    url: http://172.16.100.60:8080
+    status_code: 200
+```
+
+---
+
+# FORMAT RÉPONSE
+
+Pour CHAQUE mission, fournis :
+
+## 1. Architecture déploiement
+
+```
+┌─────────────────────────────────────────┐
+│ VM: {{ vm_name }} ({{ ip }})            │
+├─────────────────────────────────────────┤
+│ Services Docker Compose:                │
+│ ├─ Service 1 (HTTP port X)              │
+│ ├─ Service 2 (HTTP port Y)              │
+│ └─ Service 3 (HTTP port Z)              │
+│                                         │
+│ Accès externe (via reverse proxy):     │
+│ └─ https://{{ app }}.lab.local          │
+│                                         │
+│ Volumes:                                │
+│ ├─ /data/{{ app }}/data                │
+│ └─ /data/{{ app }}/config               │
+│                                         │
+│ Sécurité:                               │
+│ ├─ Trivy scan: ✅                       │
+│ ├─ Firewall UFW: ✅ (172.16.100.253)   │
+│ └─ SSL/TLS: ✅ (reverse proxy)          │
+└─────────────────────────────────────────┘
+```
+
+## 2. Structure complète rôle Ansible
+
+## 3. Fichiers COMPLETS (100%)
+
+## 4. Commandes validation
+
+## 5. Documentation troubleshooting
+
+---
+
+# COMMENCE PAR LA MISSION 0 (PKI CA)
+
+Crée l'autorité de certification locale avec rôle Ansible complet.
 ```
 
 ***
+
+**Prompt mis à jour avec :**
+- ✅ Architecture HTTP backend / HTTPS frontend
+- ✅ CA locale (certificats auto-signés)
+- ✅ Ordre missions : PKI CA → Reverse Proxy → Services
+- ✅ Nginx config complète (tous backends HTTP)
+- ✅ Tests validation SSL/TLS
 

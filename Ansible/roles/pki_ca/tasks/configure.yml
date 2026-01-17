@@ -1,0 +1,17 @@
+---
+- name: Create wildcard extension file for lab.local
+  ansible.builtin.copy:
+    dest: "{{ pki_ca_wildcard_ext_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+    force: false
+    content: |
+      authorityKeyIdentifier=keyid,issuer
+      basicConstraints=CA:FALSE
+      keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+      subjectAltName = @alt_names
+
+      [alt_names]
+      DNS.1 = *.lab.local
+      DNS.2 = lab.local

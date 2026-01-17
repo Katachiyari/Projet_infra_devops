@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
+
+ROOT_DIR="{{ pki_ca_root_dir }}"
+BACKUP_DIR="{{ pki_ca_backup_dir }}"
+
+openssl x509 -checkend 0 -noout -in "${ROOT_DIR}/wildcard.lab.local.crt" >/dev/null 2>&1 || {
+    openssl x509 -req -in "${ROOT_DIR}/wildcard.lab.local.csr" -CA "${ROOT_DIR}/root-ca.crt" -CAkey "${ROOT_DIR}/root-ca.key" -CAcreateserial -out "${ROOT_DIR}/wildcard.lab.local.crt" -days {{ pki_ca_server_validity_days }} -sha256 -extfile "${ROOT_DIR}/wildcard.lab.local.ext"
+}
+
+{% for cert in pki_ca_server_certificates %}
+openssl x509 -checkend 0 -noout -in "{{ cert.cert_file }}" >/dev/null 2>&1 || {
+    openssl x509 -req -in "{{ cert.csr_file }}" -CA "${ROOT_DIR}/root-ca.crt" -CAkey "${ROOT_DIR}/root-ca.key" -CAcreateserial -out "{{ cert.cert_file }}" -days {{ pki_ca_server_validity_days }} -sha256 -extfile "${ROOT_DIR}/wildcard.lab.local.ext"
+}
+{% endfor %}
+
+cp "${ROOT_DIR}/root-ca.key" "${BACKUP_DIR}/root-ca.key"
+chmod 600 "${BACKUP_DIR}/root-ca.key"

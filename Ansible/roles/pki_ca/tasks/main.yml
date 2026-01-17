@@ -1,0 +1,21 @@
+---
+- name: Preconditions for PKI CA
+  ansible.builtin.import_tasks: prerequisites.yml
+
+- name: Install PKI CA dependencies
+  ansible.builtin.import_tasks: install.yml
+
+- name: Configure PKI CA files
+  ansible.builtin.import_tasks: configure.yml
+
+- name: Deploy PKI CA keys and certificates
+  ansible.builtin.import_tasks: deploy.yml
+
+- name: Deploy PKI CA renewal script
+  ansible.builtin.import_tasks: deploy_script.yml
+
+- name: Apply PKI CA security hardening
+  ansible.builtin.import_tasks: security.yml
+
+- name: Validate PKI CA deployment
+  ansible.builtin.import_tasks: validation.yml

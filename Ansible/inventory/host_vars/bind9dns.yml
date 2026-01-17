@@ -31,7 +31,8 @@ bind9_zones_dynamic:
       - "dns-server.lab.local"
     rrs:
       - { label: "dns-server", type: "A", rdata: "172.16.100.254" }
-      - { label: "harbor", type: "A", rdata: "172.16.100.50" }
+      - { label: "harbor", type: "A", rdata: "172.16.100.253" }
+      - { label: "portainer", type: "A", rdata: "172.16.100.253" }
       - { label: "git-lab", type: "A", rdata: "172.16.100.40" }
       - { label: "gitlab", type: "CNAME", rdata: "git-lab.lab.local." }
       - { label: "tools-manager", type: "A", rdata: "172.16.100.20" }

@@ -1,0 +1,64 @@
+---
+- name: Seed Harbor configuration from vendor template
+  ansible.builtin.copy:
+    src: "{{ harbor_install_dir }}/harbor/harbor.yml.tmpl"
+    dest: "{{ harbor_install_dir }}/harbor/harbor.yml"
+    owner: root
+    group: root
+    mode: "0600"
+    remote_src: true
+
+- name: Set Harbor hostname
+  ansible.builtin.lineinfile:
+    path: "{{ harbor_install_dir }}/harbor/harbor.yml"
+    regexp: '^hostname:'
+    line: "hostname: {{ harbor_hostname }}"
+
+- name: Set Harbor HTTP port
+  ansible.builtin.lineinfile:
+    path: "{{ harbor_install_dir }}/harbor/harbor.yml"
+    regexp: '^  port: 80$'
+    line: "  port: {{ harbor_http_port }}"
+
+- name: Disable Harbor built-in HTTPS listener (reverse proxy handles TLS)
+  ansible.builtin.lineinfile:
+    path: "{{ harbor_install_dir }}/harbor/harbor.yml"
+    regexp: '^https:'
+    line: '# https:'
+
+- name: Comment Harbor HTTPS port line
+  ansible.builtin.lineinfile:
+    path: "{{ harbor_install_dir }}/harbor/harbor.yml"
+    regexp: '^  port: 443$'
+    line: '  # port: 443'
+
+- name: Comment Harbor HTTPS certificate path
+  ansible.builtin.lineinfile:
+    path: "{{ harbor_install_dir }}/harbor/harbor.yml"
+    regexp: '^  certificate: '
+    line: '  # certificate: /your/certificate/path'
+
+- name: Comment Harbor HTTPS private key path
+  ansible.builtin.lineinfile:
+    path: "{{ harbor_install_dir }}/harbor/harbor.yml"
+    regexp: '^  private_key: '
+    line: '  # private_key: /your/private/key/path'
+
+- name: Configure Harbor external URL for reverse proxy
+  ansible.builtin.replace:
+    path: "{{ harbor_install_dir }}/harbor/harbor.yml"
+    regexp: '^# external_url: .*$'
+    replace: "external_url: {{ harbor_external_url }}"
+
+- name: Set Harbor admin password
+  ansible.builtin.lineinfile:
+    path: "{{ harbor_install_dir }}/harbor/harbor.yml"
+    regexp: '^harbor_admin_password:'
+    line: "harbor_admin_password: {{ harbor_admin_password }}"
+
+- name: Set Harbor data volume
+  ansible.builtin.lineinfile:
+    path: "{{ harbor_install_dir }}/harbor/harbor.yml"
+    regexp: '^data_volume:'
+    line: "data_volume: {{ harbor_data_dir }}"
+

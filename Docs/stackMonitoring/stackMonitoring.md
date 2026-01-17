@@ -166,7 +166,7 @@ les noms ci-dessus sont résolus correctement.
 
 Pour rester cohérent côté DNS, d'autres services de la plateforme ont également été déclarés dans la zone `lab.local` du même fichier `bind9dns.yml` :
 
-- `harbor.lab.local` → A `172.16.100.50`
+- `harbor.lab.local` → A `172.16.100.253`
 - `git-lab.lab.local` → A `172.16.100.40`
 - `gitlab.lab.local` → CNAME vers `git-lab.lab.local.`
 - `tools-manager.lab.local` → A `172.16.100.20`

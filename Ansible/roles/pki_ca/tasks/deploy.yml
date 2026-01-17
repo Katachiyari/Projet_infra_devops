@@ -1,0 +1,57 @@
+---
+- name: Generate CA root private key
+  ansible.builtin.command:
+    cmd: "openssl genrsa -out {{ pki_ca_root_key_file }} 4096"
+    creates: "{{ pki_ca_root_key_file }}"
+
+- name: Generate CA root certificate
+  ansible.builtin.command:
+    cmd: "openssl req -x509 -new -nodes -key {{ pki_ca_root_key_file }} -sha256 -days {{ pki_ca_root_validity_days }} -out {{ pki_ca_root_cert_file }} -subj '{{ pki_ca_root_subject }}'"
+    creates: "{{ pki_ca_root_cert_file }}"
+
+- name: Generate wildcard private key
+  ansible.builtin.command:
+    cmd: "openssl genrsa -out {{ pki_ca_wildcard_key_file }} 2048"
+    creates: "{{ pki_ca_wildcard_key_file }}"
+
+- name: Generate wildcard CSR
+  ansible.builtin.command:
+    cmd: "openssl req -new -key {{ pki_ca_wildcard_key_file }} -out {{ pki_ca_wildcard_csr_file }} -subj '/C=FR/ST=IDF/L=Paris/O=Lab/CN=*.lab.local'"
+    creates: "{{ pki_ca_wildcard_csr_file }}"
+
+- name: Generate wildcard certificate
+  ansible.builtin.command:
+    cmd: "openssl x509 -req -in {{ pki_ca_wildcard_csr_file }} -CA {{ pki_ca_root_cert_file }} -CAkey {{ pki_ca_root_key_file }} -CAcreateserial -out {{ pki_ca_wildcard_cert_file }} -days {{ pki_ca_server_validity_days }} -sha256 -extfile {{ pki_ca_wildcard_ext_file }}"
+    creates: "{{ pki_ca_wildcard_cert_file }}"
+
+- name: Generate server private keys
+  ansible.builtin.command:
+    cmd: "openssl genrsa -out {{ item.key_file }} 2048"
+    creates: "{{ item.key_file }}"
+  loop: "{{ pki_ca_server_certificates }}"
+
+- name: Generate server CSRs
+  ansible.builtin.command:
+    cmd: "openssl req -new -key {{ item.key_file }} -out {{ item.csr_file }} -subj '{{ item.subject }}'"
+    creates: "{{ item.csr_file }}"
+  loop: "{{ pki_ca_server_certificates }}"
+
+- name: Generate server certificates
+  ansible.builtin.command:
+    cmd: "openssl x509 -req -in {{ item.csr_file }} -CA {{ pki_ca_root_cert_file }} -CAkey {{ pki_ca_root_key_file }} -CAcreateserial -out {{ item.cert_file }} -days {{ pki_ca_server_validity_days }} -sha256 -extfile {{ pki_ca_wildcard_ext_file }}"
+    creates: "{{ item.cert_file }}"
+  loop: "{{ pki_ca_server_certificates }}"
+
+- name: Install CA root certificate in system trust store
+  ansible.builtin.copy:
+    src: "{{ pki_ca_root_cert_file }}"
+    dest: "{{ pki_ca_trust_store_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+    remote_src: true
+
+- name: Update system CA certificates
+  ansible.builtin.command:
+    cmd: update-ca-certificates
+  changed_when: false

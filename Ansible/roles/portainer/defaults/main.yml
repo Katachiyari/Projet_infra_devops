@@ -1,0 +1,13 @@
+---
+# Defaults for Portainer role (Mission 2)
+
+portainer_install_dir: "/data/portainer"
+portainer_data_dir: "{{ portainer_install_dir }}/data"
+
+portainer_image: "portainer/portainer-ce:lts"
+portainer_http_port: 9000
+
+portainer_firewall_rules:
+  - { port: 9000, allowed_ip: "172.16.100.253" }
+
+portainer_compose_project_name: "portainer"

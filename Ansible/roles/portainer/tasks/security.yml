@@ -1,0 +1,21 @@
+---
+- name: Scan Portainer image with Trivy
+  ansible.builtin.command:
+    cmd: >-
+      docker run --rm
+      aquasec/trivy:latest
+      image --severity CRITICAL,HIGH
+      {{ portainer_image }}
+  register: portainer_trivy_result
+  changed_when: false
+  failed_when: portainer_trivy_result.rc != 0
+  tags: [security, scan]
+
+- name: Configure UFW for Portainer HTTP
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: tcp
+    from_ip: "{{ item.allowed_ip }}"
+  loop: "{{ portainer_firewall_rules }}"
+  tags: [security, firewall]

@@ -1,0 +1,59 @@
+---
+- name: Install base packages required for Harbor
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - tar
+      - gnupg
+    state: present
+    update_cache: true
+
+- name: Ensure APT keyrings directory exists for Docker
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Add Docker official GPG key
+  ansible.builtin.get_url:
+    url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg"
+    dest: /etc/apt/keyrings/docker.gpg
+    mode: "0644"
+
+- name: Add Docker APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
+    filename: docker
+    state: present
+
+- name: Install Docker engine and plugins for Harbor
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: true
+  tags: [docker]
+
+- name: Check if Harbor is already installed
+  ansible.builtin.stat:
+    path: "{{ harbor_install_dir }}/harbor.yml"
+  register: harbor_installed
+
+- name: Download Harbor offline installer
+  ansible.builtin.get_url:
+    url: "{{ harbor_offline_installer_url }}"
+    dest: "/tmp/harbor-offline-installer-{{ harbor_version }}.tgz"
+    mode: "0644"
+  when: not harbor_installed.stat.exists
+
+- name: Extract Harbor offline installer
+  ansible.builtin.unarchive:
+    src: "/tmp/harbor-offline-installer-{{ harbor_version }}.tgz"
+    dest: "{{ harbor_install_dir }}"
+    remote_src: true
+  when: not harbor_installed.stat.exists

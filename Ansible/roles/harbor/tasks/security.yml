@@ -1,0 +1,29 @@
+---
+- name: Scan Harbor core image with Trivy
+  ansible.builtin.command:
+    cmd: >-
+      docker run --rm
+      aquasec/trivy:latest
+      image --severity CRITICAL,HIGH
+      goharbor/harbor-core:{{ harbor_version }}
+  register: harbor_trivy_result
+  changed_when: false
+  failed_when: harbor_trivy_result.rc != 0
+  tags: [security, scan]
+
+- name: Ensure UFW is installed for Harbor
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+    update_cache: yes
+  when: ansible_os_family == 'Debian'
+  tags: [security, firewall]
+
+- name: Configure UFW for Harbor HTTP
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: tcp
+    from_ip: "{{ item.allowed_ip }}"
+  loop: "{{ harbor_firewall_rules }}"
+  tags: [security, firewall]

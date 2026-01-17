@@ -1,0 +1,11 @@
+---
+- name: Ensure Portainer directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ portainer_install_dir }}"
+    - "{{ portainer_data_dir }}"

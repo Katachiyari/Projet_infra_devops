@@ -1,0 +1,33 @@
+---
+- name: Check CA root certificate is installed
+  ansible.builtin.stat:
+    path: "{{ pki_ca_trust_store_path }}"
+  register: pki_ca_trust
+
+- name: Fail if CA root certificate is missing in trust store
+  ansible.builtin.fail:
+    msg: "CA root certificate is not installed in system trust store"
+  when: not pki_ca_trust.stat.exists
+
+- name: Verify wildcard certificate chain
+  ansible.builtin.command:
+    cmd: "openssl verify -CAfile {{ pki_ca_root_cert_file }} {{ pki_ca_wildcard_cert_file }}"
+  register: pki_ca_wildcard_verify
+  changed_when: false
+
+- name: Fail if wildcard certificate is not valid
+  ansible.builtin.fail:
+    msg: "Wildcard certificate validation failed"
+  when: pki_ca_wildcard_verify.rc != 0
+
+- name: Verify server certificates chain
+  ansible.builtin.command:
+    cmd: "openssl verify -CAfile {{ pki_ca_root_cert_file }} {{ item.cert_file }}"
+  loop: "{{ pki_ca_server_certificates }}"
+  register: pki_ca_server_verify
+  changed_when: false
+
+- name: Fail if any server certificate is not valid
+  ansible.builtin.fail:
+    msg: "One or more server certificates failed validation"
+  when: pki_ca_server_verify is failed

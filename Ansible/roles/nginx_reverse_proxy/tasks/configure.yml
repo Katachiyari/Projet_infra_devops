@@ -1,0 +1,16 @@
+---
+- name: Deploy nginx.conf for reverse proxy
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "{{ nginx_rp_config_dir }}/nginx.conf"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy Docker Compose file for Nginx reverse proxy
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ nginx_rp_docker_compose_path }}"
+    owner: root
+    group: root
+    mode: "0644"

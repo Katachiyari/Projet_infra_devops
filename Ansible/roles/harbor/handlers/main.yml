@@ -1,0 +1,5 @@
+---
+- name: restart harbor stack
+  ansible.builtin.command:
+    cmd: "docker compose -f {{ harbor_install_dir }}/docker-compose.yml -p {{ harbor_compose_project_name }} up -d"
+  changed_when: false

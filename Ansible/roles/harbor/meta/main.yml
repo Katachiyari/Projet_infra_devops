@@ -1,0 +1,9 @@
+---
+galaxy_info:
+  role_name: harbor
+  author: lab
+  description: Harbor registry (HTTP backend) for lab.local
+  min_ansible_version: "2.16"
+  license: MIT
+
+dependencies: []

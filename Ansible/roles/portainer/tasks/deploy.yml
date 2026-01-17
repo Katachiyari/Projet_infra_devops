@@ -1,0 +1,11 @@
+---
+- name: Ensure Portainer Docker Compose stack is present (idempotent)
+  community.docker.docker_compose_v2:
+    project_src: "{{ portainer_install_dir }}"
+    project_name: "{{ portainer_compose_project_name }}"
+    state: present
+  register: portainer_compose_result
+
+- name: Show Portainer Docker Compose result
+  ansible.builtin.debug:
+    var: portainer_compose_result

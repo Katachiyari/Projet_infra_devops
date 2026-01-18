@@ -7,7 +7,7 @@
 ![security](https://img.shields.io/badge/security-Shift--Left%20Trivy%20UFW-critical)
 ![ssot](https://img.shields.io/badge/SSOT-Single%20Source%20of%20Truth-informational)
 
-> Plateforme DevSecOps automatisée, pensée “startup” : HTTP backend, HTTPS frontend, PKI locale, sécurité by design, tout est piloté par le code.
+> Plateforme DevSecOps automatisée : HTTP backend, HTTPS frontend, PKI locale, sécurité by design, tout est piloté par le code.
 
 ---
 

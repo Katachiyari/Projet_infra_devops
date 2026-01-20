@@ -40,6 +40,12 @@ nginx_rp_backends:
   edgedoc:
     host: "172.16.100.60"
     port: 8080
+  grafana:
+    host: "172.16.100.40"
+    port: 3000
+  prometheus:
+    host: "172.16.100.40"
+    port: 9090  
 
 # UFW firewall rules for reverse proxy
 nginx_rp_firewall_rules:

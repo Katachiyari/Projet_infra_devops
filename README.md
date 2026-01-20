@@ -30,6 +30,7 @@
 - Sécurité by design (TLS, UFW, Trivy, permissions, CI/CD ready)
 - Documentation et validation automatisées
 
+
 ---
 
 ## 🏗️ Architecture réseau & flux (SSOT)

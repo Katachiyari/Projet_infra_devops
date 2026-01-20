@@ -9,17 +9,11 @@ nginx_rp_backends:
     host: "172.16.100.50"
     port: 80
   gitlab:
-    host: "172.16.100.40" 
+    host: "172.16.100.40"
     port: 80
   portainer:
     host: "172.16.100.50"
     port: 9000
-  taiga:
-    host: "172.16.100.XXX"
-    port: 80
-  edgedoc:
-    host: "172.16.100.XXX"
-    port: 80
   grafana:
     host: "172.16.100.60"
     port: 3000

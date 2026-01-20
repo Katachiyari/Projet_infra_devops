@@ -35,6 +35,7 @@ bind9_zones_dynamic:
       - { label: "portainer", type: "A", rdata: "172.16.100.253" }
       - { label: "git-lab", type: "A", rdata: "172.16.100.40" }
       - { label: "gitlab", type: "CNAME", rdata: "git-lab.lab.local." }
+      - { label: "taiga", type: "A", rdata: "172.16.100.20" }
       - { label: "tools-manager", type: "A", rdata: "172.16.100.20" }
       - { label: "monitoring", type: "A", rdata: "172.16.100.60" }
       - { label: "grafana", type: "CNAME", rdata: "monitoring.lab.local." }

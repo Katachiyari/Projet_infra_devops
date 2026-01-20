@@ -4,6 +4,8 @@
             "bind9dns": {
                 "ansible_host": "172.16.100.254",
                 "ansible_ssh_common_args": "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}",
+                "ansible_ssh_private_key_file": "~/.ssh/id_ed25519_common",
+                "ansible_user": "ansible",
                 "bastion_enabled": false,
                 "bastion_host": "172.16.100.100",
                 "bastion_user": "admin1",
@@ -30,9 +32,80 @@
                                 "label": "ns1",
                                 "rdata": "172.16.100.254",
                                 "type": "A"
+                            },
+                            {
+                                "label": "ubuntu-host",
+                                "rdata": "172.16.100.100",
+                                "type": "A"
                             }
                         ],
-                        "serial": 2026011601,
+                        "serial": 2026011701,
+                        "type": "master"
+                    },
+                    {
+                        "admin": "postmaster.lab.local",
+                        "name": "lab.local",
+                        "ns_records": [
+                            "dns-server.lab.local"
+                        ],
+                        "rrs": [
+                            {
+                                "label": "dns-server",
+                                "rdata": "172.16.100.254",
+                                "type": "A"
+                            },
+                            {
+                                "label": "harbor",
+                                "rdata": "172.16.100.253",
+                                "type": "A"
+                            },
+                            {
+                                "label": "portainer",
+                                "rdata": "172.16.100.253",
+                                "type": "A"
+                            },
+                            {
+                                "label": "git-lab",
+                                "rdata": "172.16.100.40",
+                                "type": "A"
+                            },
+                            {
+                                "label": "gitlab",
+                                "rdata": "git-lab.lab.local.",
+                                "type": "CNAME"
+                            },
+                            {
+                                "label": "taiga",
+                                "rdata": "172.16.100.20",
+                                "type": "A"
+                            },
+                            {
+                                "label": "tools-manager",
+                                "rdata": "172.16.100.20",
+                                "type": "A"
+                            },
+                            {
+                                "label": "monitoring",
+                                "rdata": "172.16.100.60",
+                                "type": "A"
+                            },
+                            {
+                                "label": "grafana",
+                                "rdata": "monitoring.lab.local.",
+                                "type": "CNAME"
+                            },
+                            {
+                                "label": "prometheus",
+                                "rdata": "monitoring.lab.local.",
+                                "type": "CNAME"
+                            },
+                            {
+                                "label": "alertmanager",
+                                "rdata": "monitoring.lab.local.",
+                                "type": "CNAME"
+                            }
+                        ],
+                        "serial": 2026011702,
                         "type": "master"
                     }
                 ]
@@ -40,6 +113,8 @@
             "git-lab": {
                 "ansible_host": "172.16.100.40",
                 "ansible_ssh_common_args": "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}",
+                "ansible_ssh_private_key_file": "~/.ssh/id_ed25519_common",
+                "ansible_user": "ansible",
                 "bastion_enabled": false,
                 "bastion_host": "172.16.100.100",
                 "bastion_user": "admin1"
@@ -47,6 +122,8 @@
             "harbor": {
                 "ansible_host": "172.16.100.50",
                 "ansible_ssh_common_args": "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}",
+                "ansible_ssh_private_key_file": "~/.ssh/id_ed25519_common",
+                "ansible_user": "ansible",
                 "bastion_enabled": false,
                 "bastion_host": "172.16.100.100",
                 "bastion_user": "admin1"
@@ -54,6 +131,8 @@
             "k3s-manager": {
                 "ansible_host": "172.16.100.250",
                 "ansible_ssh_common_args": "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}",
+                "ansible_ssh_private_key_file": "~/.ssh/id_ed25519_common",
+                "ansible_user": "ansible",
                 "bastion_enabled": false,
                 "bastion_host": "172.16.100.100",
                 "bastion_user": "admin1"
@@ -61,6 +140,8 @@
             "k3s-worker-0": {
                 "ansible_host": "172.16.100.251",
                 "ansible_ssh_common_args": "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}",
+                "ansible_ssh_private_key_file": "~/.ssh/id_ed25519_common",
+                "ansible_user": "ansible",
                 "bastion_enabled": false,
                 "bastion_host": "172.16.100.100",
                 "bastion_user": "admin1"
@@ -68,6 +149,17 @@
             "k3s-worker-1": {
                 "ansible_host": "172.16.100.252",
                 "ansible_ssh_common_args": "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}",
+                "ansible_ssh_private_key_file": "~/.ssh/id_ed25519_common",
+                "ansible_user": "ansible",
+                "bastion_enabled": false,
+                "bastion_host": "172.16.100.100",
+                "bastion_user": "admin1"
+            },
+            "monitoring-stack": {
+                "ansible_host": "172.16.100.60",
+                "ansible_ssh_common_args": "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}",
+                "ansible_ssh_private_key_file": "~/.ssh/id_ed25519_common",
+                "ansible_user": "ansible",
                 "bastion_enabled": false,
                 "bastion_host": "172.16.100.100",
                 "bastion_user": "admin1"
@@ -75,6 +167,8 @@
             "reverse-proxy": {
                 "ansible_host": "172.16.100.253",
                 "ansible_ssh_common_args": "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}",
+                "ansible_ssh_private_key_file": "~/.ssh/id_ed25519_common",
+                "ansible_user": "ansible",
                 "bastion_enabled": false,
                 "bastion_host": "172.16.100.100",
                 "bastion_user": "admin1"
@@ -82,51 +176,31 @@
             "tools-manager": {
                 "ansible_host": "172.16.100.20",
                 "ansible_ssh_common_args": "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}",
+                "ansible_ssh_private_key_file": "~/.ssh/id_ed25519_common",
+                "ansible_user": "ansible",
                 "bastion_enabled": false,
                 "bastion_host": "172.16.100.100",
-                "bastion_user": "admin1",
-                "taiga_attachments_max_age": 360,
-                "taiga_domain": "172.16.100.20:9000",
-                "taiga_email_backend": "console",
-                "taiga_email_default_from": "changeme@example.com",
-                "taiga_email_host": "",
-                "taiga_email_host_user": "",
-                "taiga_email_port": 587,
-                "taiga_email_use_ssl": false,
-                "taiga_email_use_tls": true,
-                "taiga_enable_telemetry": false,
-                "taiga_scheme": "http",
-                "taiga_subpath": "",
-                "taiga_websockets_scheme": "ws"
+                "bastion_user": "admin1"
             }
         },
         "profile": "inventory_legacy"
     },
     "all": {
         "children": [
-            "ungrouped",
-            "bind9dns",
-            "taiga_hosts"
-        ]
-    },
-    "bind9dns": {
-        "hosts": [
-            "bind9dns"
-        ]
-    },
-    "taiga_hosts": {
-        "hosts": [
-            "tools-manager"
+            "ungrouped"
         ]
     },
     "ungrouped": {
         "hosts": [
+            "bind9dns",
             "git-lab",
             "harbor",
             "k3s-manager",
             "k3s-worker-0",
             "k3s-worker-1",
-            "reverse-proxy"
+            "monitoring-stack",
+            "reverse-proxy",
+            "tools-manager"
         ]
     }
 }

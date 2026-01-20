@@ -2,112 +2,119 @@
 # tasks file for bind9_docker
 
 - name: Ensure APT cache is up to date
-	ansible.builtin.apt:
-		update_cache: true
-		cache_valid_time: 3600
-	become: true
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
 
 - name: Ensure Docker engine and dependencies are installed
-	ansible.builtin.apt:
-		name:
-			- docker.io
-			- python3-docker
-			- dnsutils
-			- ufw
-		state: present
-	become: true
+  ansible.builtin.apt:
+    name:
+      - docker.io
+      - python3-docker
+      - dnsutils
+      - ufw
+    state: present
+  become: true
 
 - name: Ensure Docker service is enabled and running
-	ansible.builtin.service:
-		name: docker
-		state: started
-		enabled: true
-	become: true
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+  become: true
 
 - name: Ensure Bind9 host directories exist
-	ansible.builtin.file:
-		path: "{{ item }}"
-		state: directory
-		owner: root
-		group: root
-		mode: "{{ bind9_docker_dir_mode }}"
-	loop:
-		- "{{ bind9_docker_config_dir }}"
-		- "{{ bind9_docker_cache_dir }}"
-	become: true
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ bind9_docker_dir_mode }}"
+  loop:
+    - "{{ bind9_docker_config_dir }}"
+    - "{{ bind9_docker_cache_dir }}"
+  become: true
 
 - name: Deploy named.conf for Bind9
-	ansible.builtin.template:
-		src: "named.conf.j2"
-		dest: "{{ bind9_docker_config_dir }}/named.conf"
-		owner: root
-		group: root
-		mode: "{{ bind9_docker_file_mode }}"
-	notify: Restart bind9 container
-	become: true
+  ansible.builtin.template:
+    src: "named.conf.j2"
+    dest: "{{ bind9_docker_config_dir }}/named.conf"
+    owner: root
+    group: root
+    mode: "{{ bind9_docker_file_mode }}"
+  notify: Restart bind9 container
+  become: true
 
 - name: Generate zone files for dynamic zones
-	ansible.builtin.template:
-		src: "db.zone.j2"
-		dest: "{{ bind9_docker_config_dir }}/db.{{ zone.name }}"
-		owner: root
-		group: root
-		mode: "{{ bind9_docker_file_mode }}"
-	loop: "{{ bind9_zones_dynamic | default([]) }}"
-	loop_control:
-		loop_var: zone
-	when: bind9_authoritative | bool
-	notify: Restart bind9 container
-	become: true
+  ansible.builtin.template:
+    src: "db.zone.j2"
+    dest: "{{ bind9_docker_config_dir }}/zones/db.{{ zone.name }}"
+    owner: root
+    group: root
+    mode: "{{ bind9_docker_file_mode }}"
+  loop: "{{ bind9_zones_dynamic | default([]) }}"
+  loop_control:
+    loop_var: zone
+  when: bind9_authoritative | bool
+  notify: Restart bind9 container
+  become: true
+
 
 - name: Ensure UFW allows DNS TCP
-	when: bind9_manage_ufw | bool
-	ansible.builtin.ufw:
-		rule: allow
-		port: "{{ bind9_port }}"
-		proto: tcp
-		comment: "{{ bind9_ufw_comment_tcp }}"
-	become: true
+  when: bind9_manage_ufw | bool
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ bind9_port }}"
+    proto: tcp
+    comment: "{{ bind9_ufw_comment_tcp }}"
+  become: true
+
 
 - name: Ensure UFW allows DNS UDP
-	when: bind9_manage_ufw | bool
-	ansible.builtin.ufw:
-		rule: allow
-		port: "{{ bind9_port }}"
-		proto: udp
-		comment: "{{ bind9_ufw_comment_udp }}"
-	become: true
+  when: bind9_manage_ufw | bool
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ bind9_port }}"
+    proto: udp
+    comment: "{{ bind9_ufw_comment_udp }}"
+  become: true
+
 
 - name: Ensure Bind9 Docker image is present
-	community.docker.docker_image:
-		name: "{{ bind9_docker_image }}:{{ bind9_docker_tag }}"
-		source: pull
+  community.docker.docker_image:
+    name: "{{ bind9_docker_image }}:{{ bind9_docker_tag }}"
+    source: pull
+
 
 - name: Ensure Bind9 container is running
-	community.docker.docker_container:
-		name: "{{ bind9_docker_container_name }}"
-		image: "{{ bind9_docker_image }}:{{ bind9_docker_tag }}"
-		state: started
-		restart_policy: always
-		network_mode: host
-		user: "{{ bind9_docker_user | default(omit) }}"
-		volumes:
-			- "{{ bind9_docker_config_dir }}:/etc/bind:rw"
-			- "{{ bind9_docker_cache_dir }}:/var/cache/bind:rw"
+  community.docker.docker_container:
+    name: "{{ bind9_docker_container_name }}"
+    image: "{{ bind9_docker_image }}:{{ bind9_docker_tag }}"
+    state: started
+    restart_policy: always
+    network_mode: host
+    user: "{{ bind9_docker_user | default(omit) }}"
+    volumes:
+      - "{{ bind9_docker_config_dir }}:/etc/bind:rw"
+      - "{{ bind9_docker_cache_dir }}:/var/cache/bind:rw"
+      - "{{ bind9_docker_log_dir }}:/var/log/bind:rw"
+
 
 - name: Healthcheck - named-checkconf inside container
-	when: bind9_healthcheck_named_checkconf | bool
-	community.docker.docker_container_exec:
-		container: "{{ bind9_docker_container_name }}"
-		command: "named-checkconf -z"
-	register: bind9_named_checkconf
-	changed_when: false
+  when: bind9_healthcheck_named_checkconf | bool
+  community.docker.docker_container_exec:
+    container: "{{ bind9_docker_container_name }}"
+    command: "named-checkconf -z"
+  register: bind9_named_checkconf
+  changed_when: false
+
 
 - name: Healthcheck - dig from control node
-	when: bind9_healthcheck_dig | bool
-	ansible.builtin.command:
-		cmd: "dig @{{ bind9_healthcheck_dig_server }} {{ bind9_healthcheck_dig_target }} +short"
-	register: bind9_dig_healthcheck
-	changed_when: false
-	delegate_to: localhost
+  when: bind9_healthcheck_dig | bool
+  ansible.builtin.command:
+    cmd: "dig @{{ bind9_healthcheck_dig_server }} {{ bind9_healthcheck_dig_target }} +short"
+  register: bind9_dig_healthcheck
+  changed_when: false
+  delegate_to: localhost
 

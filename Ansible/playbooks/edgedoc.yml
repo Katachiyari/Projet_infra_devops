@@ -1,0 +1,6 @@
+---
+# Playbook to deploy EdgeDoc using the edgedoc role
+- hosts: edgedoc
+  become: true
+  roles:
+    - edgedoc

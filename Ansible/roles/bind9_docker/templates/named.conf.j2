@@ -34,7 +34,7 @@ options {
 {%   for zone in bind9_zones_dynamic %}
 zone "{{ zone.name }}" IN {
     type master;
-    file "/etc/bind/db.{{ zone.name }}";
+    file "/etc/bind/zones/db.{{ zone.name }}";
 };
 
 {%   endfor %}

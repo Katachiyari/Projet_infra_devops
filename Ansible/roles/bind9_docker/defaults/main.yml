@@ -11,26 +11,27 @@ bind9_docker_container_name: "bind9"
 # Répertoires de persistance côté hôte
 bind9_docker_config_dir: "/srv/bind9/etc"
 bind9_docker_cache_dir: "/srv/bind9/cache"
+bind9_docker_log_dir: "/srv/bind9/log"
 
 # Port DNS
 bind9_port: 53
 
 # Adresse(s) d'écoute v4/v6 à l'intérieur du conteneur
 bind9_listen_v4:
-	- "172.16.100.254"
+  - "172.16.100.254"
 bind9_listen_v6: []
 
 # Comportement récursif / forwarders (surchargés via host_vars)
 bind9_recursor: true
 bind9_forward: true
 bind9_forward_servers:
-	- "8.8.8.8"
-	- "1.1.1.1"
+  - "8.8.8.8"
+  - "1.1.1.1"
 
 # Réseaux autorisés à interroger ce DNS
 bind9_our_networks:
-	- "172.16.0.0/16"
-	- "127.0.0.1"
+  - "172.16.0.0/16"
+  - "127.0.0.1"
 
 # Zones internes dynamiques (surchargées dans host_vars)
 bind9_authoritative: false

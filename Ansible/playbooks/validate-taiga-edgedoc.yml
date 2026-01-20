@@ -1,0 +1,28 @@
+---
+# Playbook to validate Taiga and EdgeDoc deployments
+- hosts: taiga:edgedoc
+  become: true
+  tasks:
+    - name: Check if Taiga is running
+      uri:
+        url: "http://{{ inventory_hostname }}:80"
+        status_code: 200
+      register: taiga_status
+      when: '"taiga" in group_names'
+
+    - name: Check if EdgeDoc is running
+      uri:
+        url: "http://{{ inventory_hostname }}:80"
+        status_code: 200
+      register: edgedoc_status
+      when: '"edgedoc" in group_names'
+
+    - name: Print Taiga status
+      debug:
+        var: taiga_status
+      when: taiga_status is defined
+
+    - name: Print EdgeDoc status
+      debug:
+        var: edgedoc_status
+      when: edgedoc_status is defined

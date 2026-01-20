@@ -2,7 +2,7 @@
 # handlers file for bind9_docker
 
 - name: Restart bind9 container
-	community.docker.docker_container:
-		name: "{{ bind9_docker_container_name }}"
-		state: started
-		restart: true
+  community.docker.docker_container:
+    name: "{{ bind9_docker_container_name }}"
+    state: started
+    restart: true

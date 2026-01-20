@@ -10,18 +10,6 @@
   ignore_errors: true
 
 - name: Remove existing Nginx reverse proxy stack (Docker Compose v2)
-
-- name: Stop Nginx reverse proxy containers if running
-  community.docker.docker_container:
-    name: "{{ item }}"
-    state: absent
-    force_kill: true
-  loop:
-    - nginx-reverse-proxy
-    - nginx-prometheus-exporter
-  ignore_errors: true
-
-- name: Remove existing Nginx reverse proxy stack (Docker Compose v2)
   community.docker.docker_compose_v2:
     project_src: "{{ nginx_rp_config_dir }}"
     files:

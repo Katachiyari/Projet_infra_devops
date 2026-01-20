@@ -25,7 +25,7 @@ bind9_zones_dynamic:
       - { label: "ubuntu-host", type: "A", rdata: "172.16.100.100" }
   - name: "lab.local"
     type: master
-    serial: 2026012010  # ← Incrémentezz ce numéro à chaque modification de la zone
+    serial: 2026012011
     admin: "postmaster.lab.local"
     ns_records:
       - "dns-server.lab.local"
@@ -36,6 +36,6 @@ bind9_zones_dynamic:
       - { label: "git-lab", type: "A", rdata: "172.16.100.40" }
       - { label: "gitlab", type: "CNAME", rdata: "git-lab.lab.local." }
       - { label: "taiga", type: "A", rdata: "172.16.100.20" }
-      - { label: "grafana", type: "CNAME", rdata: "monitoring.lab.local." }
-      - { label: "prometheus", type: "CNAME", rdata: "monitoring.lab.local." }
-      - { label: "alertmanager", type: "CNAME", rdata: "monitoring.lab.local." }
+      - { label: "grafana", type: "A", rdata: "172.16.100.253" }
+      - { label: "prometheus", type: "A", rdata: "172.16.100.253" }
+      - { label: "alertmanager", type: "A", rdata: "172.16.100.253" }

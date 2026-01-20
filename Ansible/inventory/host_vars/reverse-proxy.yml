@@ -1,0 +1,13 @@
+---
+nginx_rp_domain: "lab.local"
+nginx_rp_ip: "172.16.100.253"
+nginx_rp_backends:
+  grafana:
+    host: "172.16.100.60"
+    port: 3000
+  prometheus:
+    host: "172.16.100.60"
+    port: 9090
+  alertmanager:
+    host: "172.16.100.60"
+    port: 9093

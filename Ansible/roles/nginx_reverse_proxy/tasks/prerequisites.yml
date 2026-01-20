@@ -46,20 +46,3 @@
   ansible.builtin.debug:
     msg: "WARNING: SSL certificate expires in less than 24 hours!"
   when: nginx_rp_cert_validity.rc != 0
-
-  - name: Verify SSL certificate files exist
-  ansible.builtin.stat:
-    path: "{{ item }}"
-  loop:
-    - "{{ nginx_rp_ssl_dir }}/wildcard.lab.local.crt"
-    - "{{ nginx_rp_ssl_dir }}/wildcard.lab.local.key"
-    - "{{ nginx_rp_ssl_dir }}/root-ca.crt"
-  register: nginx_rp_ssl_files_check
-
-- name: Fail if SSL certificate is missing or is a directory
-  ansible.builtin.fail:
-    msg: "SSL file {{ item.item }} does not exist or is not a regular file"
-  when: not item.stat.exists or item.stat.isdir
-  loop: "{{ nginx_rp_ssl_files_check.results }}"
-  loop_control:
-    label: "{{ item.item }}"

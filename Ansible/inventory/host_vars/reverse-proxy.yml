@@ -23,3 +23,4 @@ nginx_rp_backends:
   alertmanager:
     host: "172.16.100.60"
     port: 9093
+gitlab_registry: "registry.lab.local:5000"

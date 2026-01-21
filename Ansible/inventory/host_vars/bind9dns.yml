@@ -35,7 +35,8 @@ bind9_zones_dynamic:
       - { label: "portainer", type: "A", rdata: "172.16.100.253" }
       - { label: "git-lab", type: "A", rdata: "172.16.100.40" }
       - { label: "gitlab", type: "CNAME", rdata: "git-lab.lab.local." }
-      - { label: "taiga", type: "A", rdata: "172.16.100.20" }
+      - { label: "taiga", type: "A", rdata: "172.16.100.253" }
+      - { label: "edgedoc", type: "A", rdata: "172.16.100.253" }
       - { label: "grafana", type: "A", rdata: "172.16.100.253" }
       - { label: "prometheus", type: "A", rdata: "172.16.100.253" }
       - { label: "alertmanager", type: "A", rdata: "172.16.100.253" }

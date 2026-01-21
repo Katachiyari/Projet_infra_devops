@@ -1,2 +1,16 @@
 ---
 # Default variables for EdgeDoc role
+
+edgedoc_install_dir: /opt/edgedoc
+edgedoc_port: 8080
+edgedoc_domain: "edgedoc.lab.local"
+edgedoc_scheme: "https"
+edgedoc_image: "quay.io/hedgedoc/hedgedoc:latest"
+
+# MariaDB backend for HedgeDoc
+edgedoc_db_host: edgedoc-db
+edgedoc_db_port: 3306
+edgedoc_db_name: hedgedoc
+edgedoc_db_user: hedgedoc
+edgedoc_db_password: "hedgedocpass"
+edgedoc_db_root_password: "hedgedocrootpass"

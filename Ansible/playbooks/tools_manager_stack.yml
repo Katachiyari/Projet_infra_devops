@@ -1,0 +1,29 @@
+---
+# Deploy Taiga and EdgeDoc on tools-manager (172.16.100.20)
+
+- name: Deploy Taiga and EdgeDoc on tools-manager
+  hosts: tools_hosts
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: taiga
+      vars:
+        taiga_install_dir: /opt/taiga
+        taiga_scheme: "https"
+        taiga_domain: "taiga.lab.local"
+        taiga_websockets_scheme: "wss"
+        taiga_subpath: ""
+        taiga_postgres_user: "taiga"
+        taiga_postgres_password: "{{ vault_taiga_postgres_password }}"
+        taiga_secret_key: "{{ vault_taiga_secret_key }}"
+        taiga_rabbitmq_erlang_cookie: "{{ vault_taiga_rabbitmq_erlang_cookie }}"
+        taiga_email_backend: "console"
+        taiga_enable_telemetry: false
+
+    - role: edgedoc
+      vars:
+        edgedoc_install_dir: /opt/edgedoc
+        edgedoc_port: 8080
+        edgedoc_domain: "edgedoc.lab.local"
+        edgedoc_scheme: "https"

@@ -1,6 +1,8 @@
 ---
 # Playbook to deploy EdgeDoc using the edgedoc role
-- hosts: edgedoc
+- name: Deploy EdgeDoc
+  hosts: tools_hosts
   become: true
+  gather_facts: true
   roles:
     - edgedoc

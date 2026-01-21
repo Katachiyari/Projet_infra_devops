@@ -35,10 +35,10 @@ nginx_rp_backends:
     host: "172.16.100.30"
     port: 5050
   taiga:
-    host: "172.16.100.60"
+    host: "172.16.100.20"
     port: 80
   edgedoc:
-    host: "172.16.100.60"
+    host: "172.16.100.20"
     port: 8080
   grafana:
     host: "172.16.100.60"

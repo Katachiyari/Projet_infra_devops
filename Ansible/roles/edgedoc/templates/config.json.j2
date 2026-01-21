@@ -1,0 +1,14 @@
+{
+  "production": {
+    "db": {
+      "dialect": "sqlite",
+      "storage": "/var/lib/hedgedoc/db.sqlite"
+    },
+    "domain": "{{ edgedoc_domain }}",
+    "allowAnonymous": true,
+    "allowAnonymousEdits": true,
+    "defaultPermission": "freely",
+    "loglevel": "info",
+    "sessionSecret": "please-change-me"
+  }
+}

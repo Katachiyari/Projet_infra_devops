@@ -1,2 +1,49 @@
 ---
-# Main tasks for EdgeDoc role
+# EdgeDoc role - Deploy via Docker
+
+- name: Create EdgeDoc directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ edgedoc_install_dir }}"
+    - "{{ edgedoc_install_dir }}/uploads"
+    - "{{ edgedoc_install_dir }}/db-data"
+
+- name: Ensure uploads directory ownership (UID 1000)
+  ansible.builtin.file:
+    path: "{{ edgedoc_install_dir }}/uploads"
+    state: directory
+    owner: 1000
+    group: 1000
+    mode: "0775"
+    recurse: true
+
+- name: Ensure MariaDB data directory ownership (UID 999)
+  ansible.builtin.file:
+    path: "{{ edgedoc_install_dir }}/db-data"
+    state: directory
+    owner: 999
+    group: 999
+    mode: "0755"
+    recurse: true
+
+- name: Deploy EdgeDoc Docker Compose
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ edgedoc_install_dir }}/docker-compose.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy or update EdgeDoc stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ edgedoc_install_dir }}"
+    state: present
+    pull: missing
+  register: edgedoc_result
+
+- name: Show EdgeDoc deployment result
+  ansible.builtin.debug:
+    var: edgedoc_result

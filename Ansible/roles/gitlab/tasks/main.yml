@@ -3,7 +3,7 @@
   ansible.builtin.package:
     name:
       - docker.io
-      - docker-compose-plugin
+      - docker-compose-v2
     state: present
   become: true
 

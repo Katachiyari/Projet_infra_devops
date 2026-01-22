@@ -5,14 +5,19 @@
     state: present
   become: true
 
-- name: Créer /srv/gitlab
+- name: Créer répertoires GitLab
   ansible.builtin.file:
-    path: /srv/gitlab
+    path: "{{ item }}"
     state: directory
     mode: '0755'
+  loop:
+    - /srv/gitlab/config
+    - /srv/gitlab/logs
+    - /srv/gitlab/data
+    - /srv/gitlab-runner
   become: true
 
-- name: Déployer stack GitLab
+- name: Déployer docker-compose.yml
   ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: /srv/gitlab/docker-compose.yml
@@ -20,11 +25,26 @@
   notify: restart gitlab
   become: true
 
-- name: Lancer GitLab (docker-compose V1)
-  ansible.builtin.command:
-    cmd: docker-compose up -d
-    chdir: /srv/gitlab
+- name: Déployer runner-config.toml
+  ansible.builtin.template:
+    src: runner-config.toml.j2
+    dest: /srv/gitlab-runner/config.toml
+    mode: '0600'
+  notify: restart runner
   become: true
+
+- name: Lancer GitLab (docker compose V2)
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: /srv/gitlab
   register: deploy_result
   changed_when: "'Starting' in deploy_result.stdout"
+  become: true
 
+- name: Attendre GitLab santé
+  ansible.builtin.uri:
+    url: "http://{{ gitlab_ip }}/-/health"
+    status_code: 200
+  retries: 30
+  delay: 10
+  become: true

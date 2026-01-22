@@ -1,6 +1,6 @@
 ---
-- name: Installer prérequis Docker
-  ansible.builtin.package:
+- name: Prérequis Docker
+  package:
     name:
       - ca-certificates
       - curl
@@ -9,65 +9,88 @@
     state: present
   become: true
 
-- name: Créer /etc/apt/keyrings
-  ansible.builtin.file:
+- name: Keyrings directory
+  file:
     path: /etc/apt/keyrings
     state: directory
     mode: '0755'
   become: true
 
-- name: Ajouter clé GPG Docker
-  ansible.builtin.get_url:
+- name: Download Docker GPG key
+  get_url:
     url: https://download.docker.com/linux/ubuntu/gpg
     dest: /etc/apt/keyrings/docker.asc
     mode: '0644'
   become: true
 
-- name: Ajouter repo Docker (deb822 moderne)
-  ansible.builtin.copy:
+- name: Docker deb822 repo
+  copy:
+    dest: /etc/apt/sources.list.d/docker.list
     content: |
-      Types: deb
-      URIs: https://download.docker.com/linux/ubuntu
-      Suites: jammy
-      Components: stable
-      Signed-By: /etc/apt/keyrings/docker.asc
-    dest: /etc/apt/sources.list.d/docker.sources
+      deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu jammy stable
     mode: '0644'
   become: true
 
-- name: Mettre à jour cache APT
-  ansible.builtin.apt:
-    update_cache: true
+- name: Apt update Docker repo
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
   become: true
 
-- name: Installer Docker CE + Compose V2
-  ansible.builtin.package:
+- name: Install Docker CE
+  package:
     name:
       - docker-ce
       - docker-ce-cli
       - containerd.io
-      - docker-buildx-plugin
       - docker-compose-plugin
     state: present
   become: true
+---
+- name: Prérequis Docker
+  package:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+    state: present
+  become: true
 
-- name: Configurer priorité Docker repo
-  ansible.builtin.copy:
-    content: |
-      Package: docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-      Pin: origin download.docker.com
-      Pin-Priority: 600
-    dest: /etc/apt/preferences.d/docker
+- name: Keyrings directory
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: Download Docker GPG key
+  get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
     mode: '0644'
   become: true
 
-- name: Installer Docker CE + Compose V2
-  ansible.builtin.package:
+- name: Docker deb822 repo
+  copy:
+    dest: /etc/apt/sources.list.d/docker.list
+    content: |
+      deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu jammy stable
+    mode: '0644'
+  become: true
+
+- name: Apt update Docker repo
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  become: true
+
+- name: Install Docker CE
+  package:
     name:
       - docker-ce
       - docker-ce-cli
       - containerd.io
-      - docker-buildx-plugin
       - docker-compose-plugin
     state: present
   become: true

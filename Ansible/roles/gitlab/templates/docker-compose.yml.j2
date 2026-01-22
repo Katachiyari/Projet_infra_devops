@@ -1,6 +1,6 @@
 ---
 #commentaires en Francais
-version: '3.8'
+version: '3'
 
 services:
   gitlab:
@@ -16,6 +16,7 @@ services:
         gitlab_rails['registry_enabled'] = true
         registry_external_url '{{ gitlab_registry_external_url }}'
         gitlab_rails['initial_root_password'] = '{{ gitlab_root_password }}'
+        gitlab_rails['gitlab_shell_ssh_port'] = {{ gitlab_ssh_port }}
         postgresql['shared_buffers'] = "256MB"
         redis['maxmemory'] = '{{ gitlab_redis_maxmemory }}'
         prometheus['enable'] = {{ gitlab_prometheus_enabled | lower }}

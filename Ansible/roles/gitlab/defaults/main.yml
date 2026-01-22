@@ -11,7 +11,7 @@ gitlab_registry_external_url: "https://registry.{{ gitlab_hostname }}"
 
 # Ports exposition (backend HTTP via Nginx RP)
 gitlab_http_port: 80
-gitlab_ssh_port: 22
+gitlab_ssh_port: 2222
 gitlab_registry_port: 5050
 
 # Intégrations infrastructure

@@ -1,12 +1,30 @@
 ---
-- name: Installer Docker
-  ansible.builtin.package:
-    name:
-      - docker.io
-      - docker-compose-v2
+# Docker officiel (Ubuntu 22.04)
+- name: Ajouter clé GPG Docker
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+  become: true
+
+- name: Ajouter repo Docker
+  ansible.builtin.apt_repository:
+    repo: "deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu jammy stable"
     state: present
   become: true
 
+- name: Installer Docker CE + Compose V2
+  ansible.builtin.package:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+    state: present
+    update_cache: true
+  become: true
+
+# GitLab persistance
 - name: Créer répertoires GitLab
   ansible.builtin.file:
     path: "{{ item }}"
@@ -19,6 +37,7 @@
     - "{{ gitlab_runner_config_dir | dirname }}"
   become: true
 
+# Templates SSOT
 - name: Déployer docker-compose.yml
   ansible.builtin.template:
     src: docker-compose.yml.j2
@@ -39,6 +58,7 @@
   become: true
   notify: restart runner
 
+# Déploiement
 - name: Lancer stack GitLab
   ansible.builtin.command:
     cmd: docker compose up -d
@@ -47,7 +67,7 @@
   register: deploy_result
   changed_when: "'Starting' in deploy_result.stdout"
 
-- name: Attendre GitLab prêt
+- name: Attendre GitLab prêt (5min)
   ansible.builtin.uri:
     url: "http://{{ gitlab_ip }}/-/health"
     status_code: 200

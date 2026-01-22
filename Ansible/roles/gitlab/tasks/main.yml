@@ -1,96 +1,50 @@
 ---
-- name: Prérequis Docker
-  package:
+- name: Installer Docker natif Debian 13
+  ansible.builtin.package:
     name:
-      - ca-certificates
-      - curl
-      - gnupg
-      - lsb-release
+      - docker.io
+      - docker-compose-v2
     state: present
   become: true
 
-- name: Keyrings directory
-  file:
-    path: /etc/apt/keyrings
+- name: Créer répertoires GitLab
+  ansible.builtin.file:
+    path: "{{ item }}"
     state: directory
+    owner: root
+    group: root
     mode: '0755'
+  loop:
+    - "{{ gitlab_data_dir | dirname }}"
+    - "{{ gitlab_runner_config_dir | dirname }}"
   become: true
 
-- name: Download Docker GPG key
-  get_url:
-    url: https://download.docker.com/linux/ubuntu/gpg
-    dest: /etc/apt/keyrings/docker.asc
-    mode: '0644'
+- name: Déployer docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: /srv/gitlab/docker-compose.yml
+  notify: restart gitlab
   become: true
 
-- name: Docker repo Debian Bookworm (stable)
-  ansible.builtin.copy:
-    dest: /etc/apt/sources.list.d/docker.list
-    content: |
-      deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable
-    mode: '0644'
+- name: Déployer runner config
+  ansible.builtin.template:
+    src: runner-config.toml.j2
+    dest: "{{ gitlab_runner_config_dir }}/config.toml"
+  notify: restart runner
   become: true
 
-- name: Apt update Docker repo
-  apt:
-    update_cache: yes
-    cache_valid_time: 3600
+- name: Lancer GitLab stack
+  ansible.builtin.command: docker compose up -d
+  args:
+    chdir: /srv/gitlab
+  register: deploy_result
+  changed_when: "'Starting' in deploy_result.stdout"
   become: true
 
-- name: Install Docker CE
-  package:
-    name:
-      - docker-ce
-      - docker-ce-cli
-      - containerd.io
-      - docker-compose-plugin
-    state: present
-  become: true
-
-- name: Prérequis Docker
-  package:
-    name:
-      - ca-certificates
-      - curl
-      - gnupg
-      - lsb-release
-    state: present
-  become: true
-
-- name: Keyrings directory
-  file:
-    path: /etc/apt/keyrings
-    state: directory
-    mode: '0755'
-  become: true
-
-- name: Download Docker GPG key
-  get_url:
-    url: https://download.docker.com/linux/ubuntu/gpg
-    dest: /etc/apt/keyrings/docker.asc
-    mode: '0644'
-  become: true
-
-- name: Docker deb822 repo
-  copy:
-    dest: /etc/apt/sources.list.d/docker.list
-    content: |
-      deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu jammy stable
-    mode: '0644'
-  become: true
-
-- name: Apt update Docker repo
-  apt:
-    update_cache: yes
-    cache_valid_time: 3600
-  become: true
-
-- name: Install Docker CE
-  package:
-    name:
-      - docker-ce
-      - docker-ce-cli
-      - containerd.io
-      - docker-compose-plugin
-    state: present
-  become: true
+- name: Vérifier GitLab santé
+  ansible.builtin.uri:
+    url: "http://{{ gitlab_ip }}/-/health"
+    status_code: 200
+  retries: 30
+  delay: 10
+  register: health

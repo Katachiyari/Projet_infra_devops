@@ -23,11 +23,11 @@
     mode: '0644'
   become: true
 
-- name: Docker deb822 repo
-  copy:
+- name: Docker repo Debian 13 Trixie
+  ansible.builtin.copy:
     dest: /etc/apt/sources.list.d/docker.list
     content: |
-      deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu jammy stable
+      deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian trixie stable
     mode: '0644'
   become: true
 

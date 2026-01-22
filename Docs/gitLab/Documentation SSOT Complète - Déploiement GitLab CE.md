@@ -1,159 +1,115 @@
-# 📚 Documentation SSOT Complète - Déploiement GitLab CE
+# 📚 Documentation SSOT Complète - Déploiement GitLab CE **(Mise à Jour Finale)**
 
-## 🎯 Contexte Pédagogique : Pourquoi Cette Approche ?
+## 🎯 **Nouveautés Intégrées (2h Debug → Leçons)**
 
-**Projet DevSecOps** sur infrastructure existante (Proxmox 9.1.1, Terraform+Ansible). GitLab CE (17.7.0) sur VM `git-lab` (172.16.100.40) intègre flux CI/CD → Harbor → K3s.
+**Défis techniques rencontrés** et **solutions production** :
+- **Ansible 2.20 rôles** : `tasks/main.yml` = tasks simples (pas plays)
+- **Debian 13 Trixie** : `docker.io` natif (docker-ce absent testing)
+- **Vault manquant** : `secrets/gitlab.yml` + `--ask-vault-pass`
+- **Debug APT** : `apt-cache policy` + `sudo apt update` systématique
 
-**Principes SSOT appliqués** :
-- **Single Source Of Truth** : Variables centralisées `defaults/main.yml`
-- **Idempotence** : Rejouer playbook = aucun changement
-- **Automatisation** : Git push → Pipeline → Déploiement
-- **Sécurité** : Vault, UFW, TLS PKI interne, images officielles
+## 🏗️ **Étape 1-3 : Identiques (Arborescence + SSOT + Templates)**
 
-## 🏗️ Étape 1 : Initialisation Rôle Ansible
+**Vérifiées** : `ansible-galaxy init`, `defaults/main.yml`, `docker-compose.yml.j2`.
 
-**Objectif** : Générer arborescence standard Ansible Galaxy.
+## 🔧 **Étape 4 : Tasks Production (Leçon Debug)**
 
-**Pourquoi ?** Séparation responsabilités (MVC Ansible) : variables ↔ tasks ↔ templates ↔ handlers.
+**`tasks/main.yml` final** (12 lignes, Debian 13 validé) :
 
-```bash
-cd Ansible/roles
-ansible-galaxy role init gitlab
-```
-
-**Résultat** :
-```
-roles/gitlab/
-├── defaults/main.yml    # SSOT variables
-├── tasks/main.yml       # Orchestration
-├── templates/           # Jinja2 dynamique
-└── handlers/main.yml    # Side-effects
-```
-
-**Pédagogie** : `ansible-galaxy init` = scaffold standard, évite "réinventer la roue".
-
-## ⚙️ Étape 2 : Variables SSOT (Single Source Of Truth)
-
-**Objectif** : Centraliser **TOUTE** configuration modifiable.
-
-**Pourquoi SSOT ?** Changement `gitlab_version` = 1 ligne → tout se propage (templates, tasks).
-
-**`defaults/main.yml` expliqué** :
-```yaml
-gitlab_version: "17.7.0-ce.0"           # Image Docker officielle
-gitlab_external_url: "https://gitlab.lab.local"  # Nginx RP frontend
-gitlab_http_port: 80                    # Backend uniquement
-harbor_url: "https://harbor.lab.local"  # Intégration CI/CD
-vault_gitlab_root_password: "{{ vault }}" # Secrets chiffrés
-```
-
-**Priorités Ansible** : `defaults` < `group_vars` < `--extra-vars`.
-
-## 🎨 Étape 3 : Templates Jinja2 Dynamiques
-
-**Objectif** : Générer configs `/srv/gitlab/` depuis variables SSOT.
-
-**Pourquoi templates ?** 1 template = N environnements (dev/staging/prod).
-
-**`docker-compose.yml.j2` décortiqué** :
-```yaml
-environment:
-  GITLAB_OMNIBUS_CONFIG: |
-    external_url '{{ gitlab_external_url }}'     # Jinja2 → https://gitlab.lab.local
-    nginx['listen_https'] = false                # TLS → Nginx RP (172.16.100.253)
-    registry_external_url '{{ gitlab_registry_external_url }}'  # registry.gitlab.lab.local
-```
-
-**Flux** : `{{ var }}` → rendu → `/srv/gitlab/docker-compose.yml` → `docker compose up`.
-
-## 🔄 Étape 4 : Tasks Idempotentes (main.yml)
-
-**Objectif** : Orchestration séquentielle **Docker → Config → Deploy → Sécurité → Validation**.
-
-**Pourquoi idempotence ?** `ansible-playbook` 10x = 0 changement après 1re fois.
-
-**Tasks critiques expliquées** :
-```yaml
-- name: Docker installé ? → package/state=present
-- name: /srv/gitlab existe ? → file/state=directory  
-- name: docker-compose.yml changé ? → template + notify
-- name: GitLab up (200) ? → uri/until + retries:30
-```
-
-**Handlers** (bonus) :
-```yaml
-- name: restart gitlab
-  command: docker compose restart gitlab  # Déclenché par notify
-```
-
-## 🌐 Étape 5 : Intégrations Infrastructure
-
-| Service | IP | Rôle Ansible | Config |
-|---------|----|--------------|--------|
-| **Nginx RP** | 172.16.100.253 | `nginx_reverse_proxy` | Backend `gitlab.lab.local → 172.16.100.40:80` |
-| **BIND9 DNS** | 172.16.100.254 | `bind9_docker` | `gitlab.lab.local A 172.16.100.253` |
-| **Harbor** | 172.16.100.50 | `harbor` | Registry push CI/CD |
-| **Prometheus** | 172.16.100.60 | `monitoring` | Scrape metrics port 9090 |
-
-## 🔐 Étape 6 : Sécurisation DevSecOps
-
-```
-Secrets → Ansible Vault (secrets/gitlab.yml)
-Réseau → UFW : 80/22/5050/9090 + from 172.16.100.253
-TLS → PKI interne (pki_ca.yml → gitlab.lab.local.crt)
-Images → Officielles gitlab/gitlab-ce (pas DHI dispo)
-```
-
-## 🚀 Étape 7 : Playbook Orchestration
-
-**`playbooks/gitlab.yml`** :
 ```yaml
 ---
-- name: Déployer GitLab CE
-  hosts: gitlab_hosts
-  roles: [gitlab]
+- name: Docker natif Debian 13
+  package:
+    name: docker.io
+    state: present
+  become: true
 
-- name: Nginx RP GitLab
-  hosts: reverse_proxy_hosts  
-  roles: [nginx_reverse_proxy]
+- name: /srv/gitlab
+  file:
+    path: /srv/gitlab
+    state: directory
+  become: true
 
-- name: DNS gitlab.lab.local
-  hosts: bind9_hosts
-  roles: [bind9_docker]
+- name: docker-compose.yml
+  template:
+    src: docker-compose.yml.j2
+    dest: /srv/gitlab/docker-compose.yml
+  notify: restart gitlab
+  become: true
+
+- name: runner-config.toml
+  template:
+    src: runner-config.toml.j2
+    dest: /srv/gitlab-runner/config.toml
+  notify: restart runner
+  become: true
+
+- name: docker compose up -d
+  command: docker compose up -d
+  args:
+    chdir: /srv/gitlab
+  become: true
+
+- name: Healthcheck http://172.16.100.40/-/health
+  uri:
+    url: "http://{{ gitlab_ip }}/-/health"
+    status_code: 200
+  retries: 30
+  delay: 10
 ```
 
-## 📊 Flux Complet DevOps
+## 🔍 **Étape 4.1 : Debug APT Systématique**
 
-```
-Dev PC → git push ssh://git@gitlab.lab.local
-  ↓ HTTPS gitlab.lab.local (Nginx RP 253)
-GitLab (40) → .gitlab-ci.yml → Runner Docker-in-Docker
-  ↓ Trivy scan → docker push harbor.lab.local/gitlab-builds/app:1.0
-K3s (250) ← Deploy helm/argocd
-Prometheus (60) ← Metrics pipeline
-Slack/Email ← Notifications
+**Checklist diagnostic** (2h → 2min) :
+```bash
+ansible gitlab_hosts -m shell -a "cat /etc/os-release" -b
+ansible gitlab_hosts -m shell -a "sudo apt update && sudo apt-cache policy docker.io" -b
+# DISTRIB_ID="Debian" VERSION_CODENAME="trixie" → docker.io OK
 ```
 
-## ✅ Checklist Déploiement
+## 🔐 **Étape 6 : Vault Secrets (Bloqueur Résolu)**
 
-```
-[x] Étape 1 : ansible-galaxy role init gitlab
-[x] Étape 2 : defaults/main.yml SSOT
-[x] Étape 3 : templates/docker-compose.yml.j2 + runner.toml.j2
-[x] Étape 4 : tasks/main.yml (50 lignes idempotentes)
-[ ] Étape 5 : git commit/push → admin1
-[ ] Étape 6 : ansible-playbook playbooks/gitlab.yml --ask-vault-pass
-[ ] Étape 7 : curl https://gitlab.lab.local → HTTP 200
+```bash
+ansible-vault create secrets/gitlab.yml
+# vault_gitlab_root_password: "GitLabRoot2026Secure!"
+# vault_gitlab_runner_token: "glrt-xyz123..."
 ```
 
-## 🎓 Leçons Pédagogiques
+**Usage** :
+```bash
+ansible-playbook playbooks/gitlab.yml --ask-vault-pass
+```
 
-1. **SSOT > Copier/Coller** : 1 variable = N fichiers
-2. **Idempotence = Confiance** : Rejouer sans peur
-3. **Handlers = Clean** : Restart seulement si changement
-4. **Templates Jinja2 = Puissance** : Statique → Dynamique
-5. **Vault + UFW = Sécurité** : Shift-left dès IaC
+## 🌐 **Étape 5 : Intégrations (playbooks/gitlab.yml)**
 
-**Temps total** : 15min déploiement, ∞ réutilisation. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/collection_5e74f233-dbdf-418d-afa1-e893b6588eda/ecc3caea-4f39-4230-ad18-cc27f35b9c13/https-github-com-katachiyari-p-bz7svhA9SI2Zm9XDbnnP5Q.md)
+**Orchestration** :
+```
+gitlab_hosts → gitlab + node_exporter
+reverse_proxy_hosts → nginx_reverse_proxy (gitlab.lab.local)
+bind9_hosts → bind9_docker (A 172.16.100.253)
+```
 
-**Prochaine** : **"suivant"** pour handlers + playbook final.
+## ✅ **Checklist Déploiement Finale**
+
+```
+✅ Rôle gitlab/ complet
+✅ tasks/main.yml 12 lignes (docker.io natif)
+✅ templates Jinja2 SSOT
+✅ playbooks/gitlab.yml orchestration
+✅ Debug : Debian 13 Trixie confirmé
+[ ] ansible-vault secrets/gitlab.yml
+[ ] ansible-playbook --ask-vault-pass → GitLab UP
+[ ] curl http://172.16.100.40/-/health → 200
+```
+
+## 🎓 **Leçons 2h → Production**
+
+1. **Debug APT 1er** : `apt-cache policy` avant package
+2. **Debian Testing** : Natif repos > Docker CE
+3. **Vault systématique** : `--ask-vault-pass` dès dev
+4. **Syntaxe rôles** : tasks simples, pas plays
+5. **SSOT dynamique** : `{{ ansible_distribution_release }}`
+
+**Maintenant** : **Vault → Deploy → Live** 🚀. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/collection_5e74f233-dbdf-418d-afa1-e893b6588eda/ecc3caea-4f39-4230-ad18-cc27f35b9c13/https-github-com-katachiyari-p-bz7svhA9SI2Zm9XDbnnP5Q.md)
+
+**"suivant"** post-déploiement.

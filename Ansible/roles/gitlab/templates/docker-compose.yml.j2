@@ -1,0 +1,52 @@
+---
+#commentaires en Francais
+version: '3.8'
+
+services:
+  gitlab:
+    image: gitlab/gitlab-ce:{{ gitlab_version }}
+    container_name: gitlab
+    hostname: {{ gitlab_hostname }}
+    restart: unless-stopped
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url '{{ gitlab_external_url }}'
+        nginx['listen_port'] = {{ gitlab_http_port }}
+        nginx['listen_https'] = false
+        gitlab_rails['registry_enabled'] = true
+        registry_external_url '{{ gitlab_registry_external_url }}'
+        gitlab_rails['initial_root_password'] = '{{ gitlab_root_password }}'
+        postgresql['shared_buffers'] = "256MB"
+        redis['maxmemory'] = '{{ gitlab_redis_maxmemory }}'
+        prometheus['enable'] = {{ gitlab_prometheus_enabled | lower }}
+        prometheus['listen_address'] = '0.0.0.0:9090'
+        node_exporter['enable'] = {{ gitlab_node_exporter_enabled | lower }}
+    ports:
+      - "{{ gitlab_http_port }}:80"
+      - "{{ gitlab_ssh_port }}:22"
+      - "{{ gitlab_registry_port }}:5050"
+      - "9090:9090"  # Metrics Prometheus
+    volumes:
+      - {{ gitlab_config_dir }}:/etc/gitlab
+      - {{ gitlab_logs_dir }}:/var/log/gitlab
+      - {{ gitlab_data_dir }}:/var/opt/gitlab
+    shm_size: '256m'
+    networks:
+      - gitlab-network
+
+  gitlab-runner:
+    image: gitlab/gitlab-runner:{{ gitlab_runner_version }}
+    container_name: gitlab-runner
+    restart: unless-stopped
+    volumes:
+      - {{ gitlab_runner_config_dir }}:/etc/gitlab-runner
+      - /var/run/docker.sock:/var/run/docker.sock
+      - {{ gitlab_runner_cache_dir }}:/cache
+    depends_on:
+      - gitlab
+    networks:
+      - gitlab-network
+
+networks:
+  gitlab-network:
+    driver: bridge

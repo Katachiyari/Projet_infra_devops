@@ -1,3 +1,53 @@
-#SPDX-License-Identifier: MIT-0
 ---
-# defaults file for gitlab
+# Version GitLab CE (image officielle Docker Hub)
+gitlab_version: "17.7.0-ce.0"
+gitlab_runner_version: "alpine-v17.7.0"
+
+# Configuration réseau
+gitlab_hostname: "gitlab.lab.local"
+gitlab_ip: "172.16.100.40"
+gitlab_external_url: "https://{{ gitlab_hostname }}"
+gitlab_registry_external_url: "https://registry.{{ gitlab_hostname }}"
+
+# Ports exposition (backend HTTP via Nginx RP)
+gitlab_http_port: 80
+gitlab_ssh_port: 22
+gitlab_registry_port: 5050
+
+# Intégrations infrastructure
+harbor_url: "https://harbor.lab.local"
+harbor_project: "gitlab-builds"
+k3s_api_url: "https://172.16.100.250:6443"
+prometheus_url: "http://172.16.100.60:9090"
+
+# Secrets Ansible Vault
+gitlab_root_password: "{{ vault_gitlab_root_password }}"
+gitlab_runner_token: "{{ vault_gitlab_runner_token }}"
+harbor_username: "{{ vault_harbor_username }}"
+harbor_password: "{{ vault_harbor_password }}"
+
+# Chemins persistance
+gitlab_data_dir: "/srv/gitlab/data"
+gitlab_config_dir: "/srv/gitlab/config"
+gitlab_logs_dir: "/srv/gitlab/logs"
+gitlab_runner_config_dir: "/srv/gitlab-runner/config"
+gitlab_runner_cache_dir: "/srv/gitlab-runner/cache"
+
+# PostgreSQL interne
+gitlab_postgres_user: "gitlab"
+gitlab_postgres_db: "gitlabhq_production"
+
+# Redis interne
+gitlab_redis_maxmemory: "256mb"
+
+# Runner configuration
+gitlab_runner_executor: "docker"
+gitlab_runner_docker_image: "docker:27-dind"
+gitlab_runner_concurrent: 4
+
+# Monitoring
+gitlab_prometheus_enabled: true
+gitlab_node_exporter_enabled: true
+
+# LDAP (optionnel)
+gitlab_ldap_enabled: false

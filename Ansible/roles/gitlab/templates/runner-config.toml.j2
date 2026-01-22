@@ -1,0 +1,26 @@
+concurrent = {{ gitlab_runner_concurrent }}
+check_interval = 0
+
+[session_server]
+  session_timeout = 1800
+
+[[runners]]
+  name = "docker-runner-{{ gitlab_hostname }}"
+  url = "{{ gitlab_external_url }}"
+  token = "{{ gitlab_runner_token }}"
+  executor = "{{ gitlab_runner_executor }}"
+  [runners.custom_build_dir]
+  [runners.cache]
+    [runners.cache.s3]
+    [runners.cache.gcs]
+    [runners.cache.azure]
+  [runners.docker]
+    tls_verify = false
+    image = "{{ gitlab_runner_docker_image }}"
+    privileged = true
+    disable_entrypoint_overwrite = false
+    oom_kill_disable = false
+    disable_cache = false
+    volumes = ["/cache", "/var/run/docker.sock:/var/run/docker.sock"]
+    shm_size = 0
+    network_mtu = 0

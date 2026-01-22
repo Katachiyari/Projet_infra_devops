@@ -1,3 +1,57 @@
-#SPDX-License-Identifier: MIT-0
 ---
-# tasks file for gitlab
+- name: Installer Docker
+  ansible.builtin.package:
+    name:
+      - docker.io
+      - docker-compose-plugin
+    state: present
+  become: true
+
+- name: Créer répertoires GitLab
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ gitlab_data_dir | dirname }}"
+    - "{{ gitlab_runner_config_dir | dirname }}"
+  become: true
+
+- name: Déployer docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: /srv/gitlab/docker-compose.yml
+    owner: root
+    group: root
+    mode: '0644'
+  become: true
+  notify: restart gitlab
+
+- name: Déployer runner config
+  ansible.builtin.template:
+    src: runner-config.toml.j2
+    dest: "{{ gitlab_runner_config_dir }}/config.toml"
+    owner: root
+    group: root
+    mode: '0600'
+  become: true
+  notify: restart runner
+
+- name: Lancer stack GitLab
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: /srv/gitlab
+  become: true
+  register: deploy_result
+  changed_when: "'Starting' in deploy_result.stdout"
+
+- name: Attendre GitLab prêt
+  ansible.builtin.uri:
+    url: "http://{{ gitlab_ip }}/-/health"
+    status_code: 200
+  register: health_check
+  until: health_check.status == 200
+  retries: 30
+  delay: 10

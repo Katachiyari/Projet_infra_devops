@@ -23,11 +23,11 @@
     mode: '0644'
   become: true
 
-- name: Docker repo Debian 13 Trixie
+- name: Docker repo Debian Bookworm (stable)
   ansible.builtin.copy:
     dest: /etc/apt/sources.list.d/docker.list
     content: |
-      deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian trixie stable
+      deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable
     mode: '0644'
   become: true
 

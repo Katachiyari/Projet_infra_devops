@@ -1,0 +1,21 @@
+---
+- name: Déployer GitLab CE (172.16.100.40)
+  hosts: gitlab_hosts
+  become: true
+  vars_files:
+    - ../secrets/gitlab.yml  # Vault secrets
+  roles:
+    - role: node_exporter    # Monitoring (préexistant)
+    - role: gitlab           # Nouveau rôle
+
+- name: Config Nginx RP GitLab
+  hosts: reverse_proxy_hosts
+  become: true
+  roles:
+    - nginx_reverse_proxy    # Ajout backend gitlab.lab.local
+
+- name: DNS gitlab.lab.local → Nginx RP
+  hosts: bind9_hosts
+  become: true
+  roles:
+    - bind9_docker           # Enregistrement A 172.16.100.253

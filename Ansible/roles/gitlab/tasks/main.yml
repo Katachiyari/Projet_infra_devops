@@ -20,8 +20,11 @@
   notify: restart gitlab
   become: true
 
-- name: Lancer GitLab
-  ansible.builtin.command: docker compose up -d
-  args:
+- name: Lancer GitLab (docker-compose V1)
+  ansible.builtin.command:
+    cmd: docker-compose up -d
     chdir: /srv/gitlab
   become: true
+  register: deploy_result
+  changed_when: "'Starting' in deploy_result.stdout"
+

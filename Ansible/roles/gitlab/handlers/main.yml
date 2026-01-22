@@ -1,12 +1,15 @@
----
 - name: restart gitlab
   community.docker.docker_compose_v2:
-    project_src: /srv/gitlab
+    project_src: "{{ gitlab_root_dir }}"
+    services:
+      - gitlab
     state: restarted
   become: true
 
 - name: restart runner
   community.docker.docker_compose_v2:
-    project_src: /srv/gitlab
+    project_src: "{{ gitlab_root_dir }}"
+    services:
+      - gitlab-runner
     state: restarted
   become: true

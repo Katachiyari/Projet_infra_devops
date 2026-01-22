@@ -1,53 +1,72 @@
 ---
-# Version GitLab CE (image officielle Docker Hub)
+# =============================================================================
+# Paramètres SSOT (Source Unique de Vérité)
+# =============================================================================
+gitlab_fqdn: "git-lab.lab.local"
+gitlab_scheme: "https"
+gitlab_healthcheck_path: "/help"
+gitlab_validate_certs: false
+gitlab_proxy_port: 443
+
+# =============================================================================
+# Versions (pinned) et images Docker
+# =============================================================================
 gitlab_version: "17.7.0-ce.0"
 gitlab_runner_version: "alpine-v17.7.0"
 
-# Configuration réseau
-gitlab_hostname: "gitlab.lab.local"
-gitlab_ip: "172.16.100.40"
-gitlab_external_url: "https://{{ gitlab_hostname }}"
-gitlab_registry_external_url: "https://registry.{{ gitlab_hostname }}"
+gitlab_image: "gitlab/gitlab-ce:{{ gitlab_version }}"
+gitlab_runner_image: "gitlab/gitlab-runner:{{ gitlab_runner_version }}"
 
-# Ports exposition (backend HTTP via Nginx RP)
-gitlab_http_port: 80
-gitlab_ssh_port: 2222
-gitlab_registry_port: 5050
+# =============================================================================
+# Réseau interne GitLab (Workhorse) : backend reverse-proxy
+# =============================================================================
+gitlab_workhorse_port: 8181
 
-# Intégrations infrastructure
+# =============================================================================
+# SSH GitLab (optionnel)
+# =============================================================================
+gitlab_ssh_publish: true
+gitlab_ssh_host_port: 2222
+
+# =============================================================================
+# Chemins persistants (SSOT)
+# =============================================================================
+gitlab_root_dir: "/srv/gitlab"
+gitlab_config_dir: "/srv/gitlab/config"
+gitlab_logs_dir: "/srv/gitlab/logs"
+gitlab_data_dir: "/srv/gitlab/data"
+gitlab_runner_dir: "/srv/gitlab/runner"
+gitlab_runner_config_dir: "{{ gitlab_runner_dir }}"
+gitlab_runner_cache_dir: "{{ gitlab_runner_dir }}/cache"
+
+# =============================================================================
+# Intégrations infrastructure (non sensibles)
+# =============================================================================
 harbor_url: "https://harbor.lab.local"
 harbor_project: "gitlab-builds"
 k3s_api_url: "https://172.16.100.250:6443"
 prometheus_url: "http://172.16.100.60:9090"
 
-# Secrets Ansible Vault
-gitlab_root_password: "{{ vault_gitlab_root_password }}"
-gitlab_runner_token: "{{ vault_gitlab_runner_token }}"
-harbor_username: "{{ vault_harbor_username }}"
-harbor_password: "{{ vault_harbor_password }}"
+gitlab_prometheus_enabled: true
+gitlab_node_exporter_enabled: true
 
-# Chemins persistance
-gitlab_data_dir: "/srv/gitlab/data"
-gitlab_config_dir: "/srv/gitlab/config"
-gitlab_logs_dir: "/srv/gitlab/logs"
-gitlab_runner_config_dir: "/srv/gitlab-runner/config"
-gitlab_runner_cache_dir: "/srv/gitlab-runner/cache"
+gitlab_ldap_enabled: false
 
-# PostgreSQL interne
-gitlab_postgres_user: "gitlab"
-gitlab_postgres_db: "gitlabhq_production"
-
-# Redis interne
-gitlab_redis_maxmemory: "256mb"
-
-# Runner configuration
+# =============================================================================
+# Runner (exécution Docker)
+# =============================================================================
 gitlab_runner_executor: "docker"
 gitlab_runner_docker_image: "docker:27-dind"
 gitlab_runner_concurrent: 4
 
-# Monitoring
-gitlab_prometheus_enabled: true
-gitlab_node_exporter_enabled: true
+# =============================================================================
+# Rétrocompatibilité (à supprimer après migration des templates)
+# =============================================================================
+gitlab_hostname: "{{ gitlab_fqdn }}"
+gitlab_external_url: "{{ gitlab_scheme }}://{{ gitlab_fqdn }}"
+gitlab_registry_external_url: "https://registry.{{ gitlab_hostname }}"
 
-# LDAP (optionnel)
-gitlab_ldap_enabled: false
+gitlab_http_port: 80
+gitlab_registry_port: 5050
+
+

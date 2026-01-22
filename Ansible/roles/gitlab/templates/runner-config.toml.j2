@@ -1,26 +1,49 @@
+# =============================================================================
+# runner-config.toml.j2
+# =============================================================================
+# Rôle : Configurer GitLab Runner (config.toml) pour exécuter les jobs CI/CD.
+#
+# Hypothèses :
+# - Le Runner s'enregistre sur l'URL SSOT GitLab (gitlab_scheme + gitlab_fqdn).
+# - Le token provient d'Ansible Vault (variable gitlab_runner_token).
+# - L'exécution des jobs se fait via Docker executor (accès au socket Docker hôte).
+#
+# Attention DevSecOps :
+# - Le montage /var/run/docker.sock donne un accès puissant au Docker hôte.
+# - Ce modèle doit être assumé et encadré (projet dédié, contrôle d'accès, etc.).
+# =============================================================================
+
+# Nombre de jobs exécutables en parallèle par ce Runner.
 concurrent = {{ gitlab_runner_concurrent }}
+
+# Intervalle de polling (0 = valeur par défaut du Runner).
 check_interval = 0
 
 [session_server]
+  # Durée maximale des sessions (ex: web terminal).
   session_timeout = 1800
 
 [[runners]]
-  name = "docker-runner-{{ gitlab_hostname }}"
-  url = "{{ gitlab_external_url }}"
+  # Nom logique du Runner (identification dans l'UI GitLab).
+  name = "gitlab-runner"
+
+  # URL GitLab (SSOT) : correspond au point d'entrée reverse-proxy.
+  url = "{{ gitlab_scheme }}://{{ gitlab_fqdn }}"
+
+  # Token d'enregistrement (provenant d'Ansible Vault).
   token = "{{ gitlab_runner_token }}"
+
+  # Type d'exécuteur (ex: docker, shell, etc.).
   executor = "{{ gitlab_runner_executor }}"
-  [runners.custom_build_dir]
-  [runners.cache]
-    [runners.cache.s3]
-    [runners.cache.gcs]
-    [runners.cache.azure]
+
   [runners.docker]
-    tls_verify = false
+    # Image par défaut utilisée pour exécuter les jobs si non spécifiée dans le pipeline.
     image = "{{ gitlab_runner_docker_image }}"
+
+    # Mode privilégié requis pour certains usages (ex: Docker-in-Docker).
     privileged = true
-    disable_entrypoint_overwrite = false
-    oom_kill_disable = false
-    disable_cache = false
+
+    # Volumes :
+    # - /cache : permet l'utilisation du cache CI.
+    # - /var/run/docker.sock : accès au Docker hôte (Docker executor).
     volumes = ["/cache", "/var/run/docker.sock:/var/run/docker.sock"]
-    shm_size = 0
-    network_mtu = 0

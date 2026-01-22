@@ -2,9 +2,31 @@
 # -----------------------------------------------------------------------------
 # Rôle: gitlab
 # But: Installer Docker, déployer GitLab CE + GitLab Runner via Compose,
-#      puis attendre que GitLab soit réellement disponible.
+#      puis attendre que GitLab soit réellement disponible VIA le reverse-proxy.
 # Contrainte: exécution en root via become: true.
 # -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# 0) Variables attendues (SSOT)
+# - gitlab_fqdn: FQDN public GitLab (ex: git-lab.lab.local)
+# - gitlab_scheme: https
+# - gitlab_healthcheck_path: /help (200) ou / (302)
+# - gitlab_validate_certs: false si certificat auto-signé
+# - gitlab_proxy_port: 443 (port d'entrée reverse-proxy)
+# -----------------------------------------------------------------------------
+- name: Vérifier variables essentielles (SSOT GitLab)
+  ansible.builtin.assert:
+    that:
+      - gitlab_fqdn is defined
+      - gitlab_scheme is defined
+      - gitlab_healthcheck_path is defined
+  fail_msg: >
+    Les variables SSOT suivantes doivent être définies :
+    - gitlab_fqdn
+    - gitlab_scheme
+    - gitlab_healthcheck_path
+
+  become: true
 
 # -----------------------------------------------------------------------------
 # 1) Prérequis système: installation des paquets Docker.
@@ -15,13 +37,12 @@
   ansible.builtin.package:
     name:
       - docker.io
-      - docker-compose  # Paquet Debian ; l'exécution réelle est pilotée par le module Ansible community.docker
+      - docker-compose  # Paquet Debian ; l'exécution réelle est pilotée par community.docker.docker_compose_v2
     state: present
   become: true
 
 # -----------------------------------------------------------------------------
 # 2) Service Docker: démarrer et activer au boot.
-# Objectif: garantir que le daemon Docker tourne avant de lancer la stack GitLab.
 # -----------------------------------------------------------------------------
 - name: Service Docker actif
   ansible.builtin.service:
@@ -32,7 +53,6 @@
 
 # -----------------------------------------------------------------------------
 # 3) Volumes persistants GitLab.
-# Objectif: conserver config/logs/data même si le conteneur est recréé.
 # -----------------------------------------------------------------------------
 - name: Créer répertoires volumes
   ansible.builtin.file:
@@ -46,10 +66,20 @@
     - runner
   become: true
 
+- name: Créer répertoires volumes
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ gitlab_config_dir }}"
+    - "{{ gitlab_logs_dir }}"
+    - "{{ gitlab_data_dir }}"
+    - "{{ gitlab_runner_dir }}"
+    - "{{ gitlab_runner_cache_dir }}"
+
 # -----------------------------------------------------------------------------
 # 4) Déploiement du docker-compose.yml.
-# Objectif: générer la définition de la stack (GitLab + Runner) depuis un template Jinja2.
-# Remarque: le handler "restart gitlab" ne se déclenche que si le fichier change (idempotence).
 # -----------------------------------------------------------------------------
 - name: Déployer docker-compose.yml
   ansible.builtin.template:
@@ -61,21 +91,18 @@
 
 # -----------------------------------------------------------------------------
 # 5) Configuration GitLab Runner.
-# Objectif: pousser le fichier config.toml (ou équivalent) du runner.
-# Remarque: secrets (token) doivent venir d'Ansible Vault (chiffrement).
+# NOTE: vous utilisez /srv/gitlab-runner ici ; à vérifier si vous vouliez /srv/gitlab/runner.
+# Je ne change pas sans nécessité, mais gardez une SSOT de chemins.
 # -----------------------------------------------------------------------------
 - name: Déployer runner config
   ansible.builtin.template:
     src: runner-config.toml.j2
-    dest: /srv/gitlab-runner/config.toml
+    dest: "{{ gitlab_runner_config_dir }}/config.toml"
     mode: '0600'
-  notify: restart runner
-  become: true
+
 
 # -----------------------------------------------------------------------------
 # 6) Lancer / converger la stack GitLab via le module community.docker.
-# Objectif: éviter command/shell et rester idempotent (Ansible pilote Compose).
-# state: present => s'assure que les services existent et tournent conformément au compose.
 # -----------------------------------------------------------------------------
 - name: Lancer GitLab (Compose piloté par Ansible)
   community.docker.docker_compose_v2:
@@ -86,25 +113,41 @@
   become: true
 
 # -----------------------------------------------------------------------------
-# 7) Attente robuste (2 niveaux):
-# A) Attendre que le port HTTP soit ouvert (évite "Connection refused").
-# B) Une fois le port ouvert, vérifier l'endpoint /-/health (GitLab opérationnel).
-# Référence: module wait_for officiel Ansible. [web:42]
+# 7) Attente robuste (SSOT):
+# A) Attendre l'ouverture du port HTTPS sur le reverse-proxy (443)
+# B) Vérifier l'endpoint applicatif via le FQDN (GitLab réellement prêt)
+#
+# On NE teste PLUS 172.16.100.40:80 car Nginx Omnibus est désactivé et GitLab
+# doit être atteint via le reverse-proxy (172.16.100.253) en HTTPS.
 # -----------------------------------------------------------------------------
-- name: Attendre ouverture du port HTTP GitLab
+
+# A) Niveau réseau: le port 443 doit être accessible (évite "Connection refused")
+- name: Attendre ouverture du port HTTPS GitLab (reverse-proxy)
   ansible.builtin.wait_for:
-    host: "{{ gitlab_ip }}"
-    port: "{{ gitlab_http_port }}"
+    host: "{{ gitlab_fqdn }}"
+    port: "{{ gitlab_proxy_port | default(443) }}"
     delay: 5
     timeout: 900
   become: true
 
-- name: Attendre GitLab santé (endpoint /-/health)
+# B) Niveau applicatif: GitLab répond (200 sur /help, ou 302 sur /)
+- name: Attendre GitLab via reverse-proxy (endpoint applicatif)
   ansible.builtin.uri:
-    url: "http://{{ gitlab_ip }}:{{ gitlab_http_port }}/-/health"
-    status_code: 200
-  register: gitlab_health
-  retries: 60
+    url: "{{ gitlab_scheme }}://{{ gitlab_fqdn }}{{ gitlab_healthcheck_path }}"
+    method: GET
+    status_code:
+      - 200
+      - 302
+    validate_certs: "{{ gitlab_validate_certs | default(false) }}"
+    timeout: 10
+  register: gitlab_ready
+  retries: 180
   delay: 10
-  until: gitlab_health.status == 200
+  until: gitlab_ready.status in [200, 302]
   become: true
+
+- name: Confirmation GitLab
+  ansible.builtin.debug:
+    msg: >
+      GitLab est disponible à l'adresse
+      {{ gitlab_scheme }}://{{ gitlab_fqdn }}

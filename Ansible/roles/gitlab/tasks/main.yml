@@ -1,12 +1,28 @@
 ---
+# -----------------------------------------------------------------------------
+# Rôle: gitlab
+# But: Installer Docker, déployer GitLab CE + GitLab Runner via Compose,
+#      puis attendre que GitLab soit réellement disponible.
+# Contrainte: exécution en root via become: true.
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# 1) Prérequis système: installation des paquets Docker.
+# - docker.io : moteur Docker (daemon)
+# - docker-compose : fourni par Debian (commande compose/compat)
+# -----------------------------------------------------------------------------
 - name: Prérequis Docker
   ansible.builtin.package:
     name:
       - docker.io
-      - docker-compose            # V1 stable Trixie
+      - docker-compose  # Paquet Debian ; l'exécution réelle est pilotée par le module Ansible community.docker
     state: present
   become: true
 
+# -----------------------------------------------------------------------------
+# 2) Service Docker: démarrer et activer au boot.
+# Objectif: garantir que le daemon Docker tourne avant de lancer la stack GitLab.
+# -----------------------------------------------------------------------------
 - name: Service Docker actif
   ansible.builtin.service:
     name: docker
@@ -14,6 +30,10 @@
     enabled: true
   become: true
 
+# -----------------------------------------------------------------------------
+# 3) Volumes persistants GitLab.
+# Objectif: conserver config/logs/data même si le conteneur est recréé.
+# -----------------------------------------------------------------------------
 - name: Créer répertoires volumes
   ansible.builtin.file:
     path: "/srv/gitlab/{{ item }}"
@@ -26,6 +46,11 @@
     - runner
   become: true
 
+# -----------------------------------------------------------------------------
+# 4) Déploiement du docker-compose.yml.
+# Objectif: générer la définition de la stack (GitLab + Runner) depuis un template Jinja2.
+# Remarque: le handler "restart gitlab" ne se déclenche que si le fichier change (idempotence).
+# -----------------------------------------------------------------------------
 - name: Déployer docker-compose.yml
   ansible.builtin.template:
     src: docker-compose.yml.j2
@@ -34,6 +59,11 @@
   notify: restart gitlab
   become: true
 
+# -----------------------------------------------------------------------------
+# 5) Configuration GitLab Runner.
+# Objectif: pousser le fichier config.toml (ou équivalent) du runner.
+# Remarque: secrets (token) doivent venir d'Ansible Vault (chiffrement).
+# -----------------------------------------------------------------------------
 - name: Déployer runner config
   ansible.builtin.template:
     src: runner-config.toml.j2
@@ -42,18 +72,39 @@
   notify: restart runner
   become: true
 
-- name: Lancer GitLab (docker-compose V1 Trixie)
+# -----------------------------------------------------------------------------
+# 6) Lancer / converger la stack GitLab via le module community.docker.
+# Objectif: éviter command/shell et rester idempotent (Ansible pilote Compose).
+# state: present => s'assure que les services existent et tournent conformément au compose.
+# -----------------------------------------------------------------------------
+- name: Lancer GitLab (Compose piloté par Ansible)
   community.docker.docker_compose_v2:
     project_src: /srv/gitlab
     state: present
-    files: 
+    files:
       - docker-compose.yml
   become: true
 
-- name: Attendre GitLab santé
+# -----------------------------------------------------------------------------
+# 7) Attente robuste (2 niveaux):
+# A) Attendre que le port HTTP soit ouvert (évite "Connection refused").
+# B) Une fois le port ouvert, vérifier l'endpoint /-/health (GitLab opérationnel).
+# Référence: module wait_for officiel Ansible. [web:42]
+# -----------------------------------------------------------------------------
+- name: Attendre ouverture du port HTTP GitLab
+  ansible.builtin.wait_for:
+    host: "{{ gitlab_ip }}"
+    port: "{{ gitlab_http_port }}"
+    delay: 5
+    timeout: 900
+  become: true
+
+- name: Attendre GitLab santé (endpoint /-/health)
   ansible.builtin.uri:
-    url: "http://{{ gitlab_ip }}/-/health"
+    url: "http://{{ gitlab_ip }}:{{ gitlab_http_port }}/-/health"
     status_code: 200
-  retries: 30
+  register: gitlab_health
+  retries: 60
   delay: 10
+  until: gitlab_health.status == 200
   become: true

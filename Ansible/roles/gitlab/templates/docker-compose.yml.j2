@@ -1,53 +1,183 @@
 ---
-#commentaires en Francais
-version: '3'
+# =============================================================================
+# docker-compose.yml.j2
+# =============================================================================
+# Rôle: Déployer GitLab CE (Omnibus) + GitLab Runner via Docker Compose (compose)
+# Objectifs:
+# - Exposer GitLab en HTTP (port hôte configurable)
+# - Exposer Git SSH sur un port hôte configurable (ex: 2222) pour éviter conflit avec sshd
+# - Exposer le Container Registry (port hôte configurable, ex: 5050)
+# - Persister config/logs/data via volumes (sur disque hôte)
+# Bonnes pratiques (best practices):
+# - Variables Ansible centralisées (defaults / group_vars / vault)
+# - Aucune valeur sensible en dur dans ce fichier (mot de passe -> Vault)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# NOTE Docker Compose V2:
+# - L'attribut "version" est obsolète et ignoré par Compose V2.
+# - Le garder déclenche un warning, donc on le supprime (ou on le commente).
+# -----------------------------------------------------------------------------
+# version: '3'
 
 services:
+  # ===========================================================================
+  # Service: gitlab
+  # ===========================================================================
+  # GitLab "Omnibus" embarque plusieurs composants (nginx, puma, sidekiq, redis,
+  # postgres, etc.) et s'administre via une configuration type gitlab.rb.
+  # Ici, on injecte cette configuration via GITLAB_OMNIBUS_CONFIG.
+  # ===========================================================================
   gitlab:
+    # Image officielle GitLab CE taggée via variable (pinning version = reproductible).
     image: gitlab/gitlab-ce:{{ gitlab_version }}
+
+    # Nom du conteneur: facilite l'exploitation (docker logs gitlab, etc.).
     container_name: gitlab
+
+    # Hostname interne au conteneur (utile pour URLs et certaines configs).
     hostname: {{ gitlab_hostname }}
+
+    # Redémarrage: utile en production; évite les indisponibilités après reboot.
     restart: unless-stopped
+
     environment:
+      # -----------------------------------------------------------------------
+      # GITLAB_OMNIBUS_CONFIG:
+      # Bloc multi-lignes interprété comme la config Omnibus (équivalent gitlab.rb).
+      # Chaque ligne impacte le comportement GitLab au démarrage (reconfigure).
+      # -----------------------------------------------------------------------
       GITLAB_OMNIBUS_CONFIG: |
+        # URL "publique" d'accès à GitLab (celle que les utilisateurs utilisent).
+        # IMPORTANT: doit correspondre au DNS/IP + schéma (http/https) + port si non standard.
         external_url '{{ gitlab_external_url }}'
+
+        # ---------------------------------------------------------------------
+        # NGINX (proxy interne GitLab):
+        # On force le mode HTTP pour l'instant (HTTPS viendra plus tard via certificats).
+        # ---------------------------------------------------------------------
         nginx['listen_port'] = {{ gitlab_http_port }}
         nginx['listen_https'] = false
+
+        # ---------------------------------------------------------------------
+        # Container Registry (registre de conteneurs):
+        # Permet de stocker/puller des images de conteneurs liées aux projets GitLab.
+        # ---------------------------------------------------------------------
         gitlab_rails['registry_enabled'] = true
+
+        # URL externe du Registry (doit être cohérente avec le port 5050 exposé).
         registry_external_url '{{ gitlab_registry_external_url }}'
+
+        # ---------------------------------------------------------------------
+        # Sécurité (DevSecOps):
+        # Mot de passe root initial.
+        # - Doit provenir d'Ansible Vault (secret chiffré)
+        # - Ne pas committer ce secret en clair dans Git
+        # ---------------------------------------------------------------------
         gitlab_rails['initial_root_password'] = '{{ gitlab_root_password }}'
+
+        # ---------------------------------------------------------------------
+        # SSH Git:
+        # Le conteneur écoute en interne sur 22, mais sur l'hôte on publie souvent 2222
+        # pour ne pas entrer en conflit avec sshd (port 22 hôte).
+        # Cette directive permet à GitLab d'afficher le bon port dans "Clone SSH".
+        # ---------------------------------------------------------------------
         gitlab_rails['gitlab_shell_ssh_port'] = {{ gitlab_ssh_port }}
+
+        # ---------------------------------------------------------------------
+        # Tuning (performances) basiques:
+        # Ajustables selon RAM/CPU de la VM.
+        # ---------------------------------------------------------------------
         postgresql['shared_buffers'] = "256MB"
         redis['maxmemory'] = '{{ gitlab_redis_maxmemory }}'
+
+        # ---------------------------------------------------------------------
+        # Observabilité:
+        # Prometheus interne GitLab: utile si tu veux scrapper des métriques directement.
+        # ---------------------------------------------------------------------
         prometheus['enable'] = {{ gitlab_prometheus_enabled | lower }}
         prometheus['listen_address'] = '0.0.0.0:9090'
+
+        # Node exporter: exporter système (si activé).
         node_exporter['enable'] = {{ gitlab_node_exporter_enabled | lower }}
+
     ports:
+      # -----------------------------------------------------------------------
+      # Publication de ports:
+      # format: "PORT_HOTE:PORT_CONTENEUR"
+      # -----------------------------------------------------------------------
+
+      # Web GitLab HTTP (hôte -> conteneur 80).
       - "{{ gitlab_http_port }}:80"
+
+      # SSH Git (hôte -> conteneur 22).
+      # IMPORTANT: ne pas publier 22:22 si sshd tourne sur l'hôte.
       - "{{ gitlab_ssh_port }}:22"
+
+      # GitLab Container Registry (hôte -> conteneur 5050).
       - "{{ gitlab_registry_port }}:5050"
+
+      # Prometheus interne GitLab (optionnel).
       - "9090:9090"  # Metrics Prometheus
+
     volumes:
+      # -----------------------------------------------------------------------
+      # Volumes persistants:
+      # Sans ces volumes, une recréation du conteneur ferait perdre données/config.
+      # -----------------------------------------------------------------------
       - {{ gitlab_config_dir }}:/etc/gitlab
       - {{ gitlab_logs_dir }}:/var/log/gitlab
       - {{ gitlab_data_dir }}:/var/opt/gitlab
+
+    # Mémoire partagée: GitLab recommande souvent une shm suffisante pour certains usages.
     shm_size: '256m'
+
     networks:
+      # Réseau dédié: isole la stack et simplifie la communication inter-services.
       - gitlab-network
 
+  # ===========================================================================
+  # Service: gitlab-runner
+  # ===========================================================================
+  # GitLab Runner exécute les jobs CI/CD (pipelines).
+  # Ici on le prépare pour exécuter des jobs via Docker (docker executor),
+  # d'où le montage /var/run/docker.sock.
+  # ===========================================================================
   gitlab-runner:
+    # Image officielle GitLab Runner taggée via variable.
     image: gitlab/gitlab-runner:{{ gitlab_runner_version }}
+
+    # Nom du conteneur Runner.
     container_name: gitlab-runner
+
+    # Politique de redémarrage.
     restart: unless-stopped
+
     volumes:
+      # Configuration persistante du Runner (config.toml).
       - {{ gitlab_runner_config_dir }}:/etc/gitlab-runner
+
+      # DevSecOps: accès au démon Docker hôte.
+      # ATTENTION: c'est puissant (quasi root sur l'hôte via Docker).
+      # À garder uniquement si tu assumes ce modèle (runner "docker executor").
       - /var/run/docker.sock:/var/run/docker.sock
+
+      # Cache CI (accélère les builds).
       - {{ gitlab_runner_cache_dir }}:/cache
+
+    # Dépendance de démarrage: lance le runner après gitlab (ordre).
     depends_on:
       - gitlab
+
     networks:
+      # Même réseau pour joindre GitLab.
       - gitlab-network
 
 networks:
+  # ===========================================================================
+  # Réseau: gitlab-network
+  # ===========================================================================
+  # bridge: réseau local Docker standard, suffisant pour une VM simple.
+  # ===========================================================================
   gitlab-network:
     driver: bridge

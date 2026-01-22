@@ -1,20 +1,29 @@
 ---
-- name: Installer Docker
+- name: Prérequis Docker
   ansible.builtin.package:
-    name: docker.io
+    name:
+      - docker.io
+      - docker-compose            # V1 stable Trixie
     state: present
   become: true
 
-- name: Créer répertoires GitLab
+- name: Service Docker actif
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+  become: true
+
+- name: Créer répertoires volumes
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "/srv/gitlab/{{ item }}"
     state: directory
     mode: '0755'
   loop:
-    - /srv/gitlab/config
-    - /srv/gitlab/logs
-    - /srv/gitlab/data
-    - /srv/gitlab-runner
+    - config
+    - logs
+    - data
+    - runner
   become: true
 
 - name: Déployer docker-compose.yml
@@ -25,7 +34,7 @@
   notify: restart gitlab
   become: true
 
-- name: Déployer runner-config.toml
+- name: Déployer runner config
   ansible.builtin.template:
     src: runner-config.toml.j2
     dest: /srv/gitlab-runner/config.toml
@@ -33,12 +42,12 @@
   notify: restart runner
   become: true
 
-- name: Lancer GitLab (docker compose V2)
-  ansible.builtin.command:
-    cmd: docker compose up -d
-    chdir: /srv/gitlab
-  register: deploy_result
-  changed_when: "'Starting' in deploy_result.stdout"
+- name: Lancer GitLab (docker-compose V1 Trixie)
+  community.docker.docker_compose_v2:
+    project_src: /srv/gitlab
+    state: present
+    files: 
+      - docker-compose.yml
   become: true
 
 - name: Attendre GitLab santé

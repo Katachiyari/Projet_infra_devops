@@ -1,12 +1,12 @@
 ---
 - name: restart gitlab
-  ansible.builtin.command:
-    cmd: docker compose restart gitlab
-    chdir: /srv/gitlab
+  community.docker.docker_compose_v2:
+    project_src: /srv/gitlab
+    state: restarted
   become: true
 
 - name: restart runner
-  ansible.builtin.command:
-    cmd: docker compose restart gitlab-runner
-    chdir: /srv/gitlab
+  community.docker.docker_compose_v2:
+    project_src: /srv/gitlab
+    state: restarted
   become: true

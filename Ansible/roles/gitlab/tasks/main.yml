@@ -1,50 +1,27 @@
 ---
-- name: Installer Docker natif Debian 13
+- name: Installer Docker
   ansible.builtin.package:
-    name:
-      - docker.io
-      - docker-compose-v2
+    name: docker.io
     state: present
   become: true
 
-- name: Créer répertoires GitLab
+- name: Créer /srv/gitlab
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: /srv/gitlab
     state: directory
-    owner: root
-    group: root
     mode: '0755'
-  loop:
-    - "{{ gitlab_data_dir | dirname }}"
-    - "{{ gitlab_runner_config_dir | dirname }}"
   become: true
 
-- name: Déployer docker-compose.yml
+- name: Déployer stack GitLab
   ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: /srv/gitlab/docker-compose.yml
+    mode: '0644'
   notify: restart gitlab
   become: true
 
-- name: Déployer runner config
-  ansible.builtin.template:
-    src: runner-config.toml.j2
-    dest: "{{ gitlab_runner_config_dir }}/config.toml"
-  notify: restart runner
-  become: true
-
-- name: Lancer GitLab stack
+- name: Lancer GitLab
   ansible.builtin.command: docker compose up -d
   args:
     chdir: /srv/gitlab
-  register: deploy_result
-  changed_when: "'Starting' in deploy_result.stdout"
   become: true
-
-- name: Vérifier GitLab santé
-  ansible.builtin.uri:
-    url: "http://{{ gitlab_ip }}/-/health"
-    status_code: 200
-  retries: 30
-  delay: 10
-  register: health

@@ -50,3 +50,24 @@
       - docker-compose-plugin
     state: present
   become: true
+
+- name: Configurer priorité Docker repo
+  ansible.builtin.copy:
+    content: |
+      Package: docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+      Pin: origin download.docker.com
+      Pin-Priority: 600
+    dest: /etc/apt/preferences.d/docker
+    mode: '0644'
+  become: true
+
+- name: Installer Docker CE + Compose V2
+  ansible.builtin.package:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+  become: true

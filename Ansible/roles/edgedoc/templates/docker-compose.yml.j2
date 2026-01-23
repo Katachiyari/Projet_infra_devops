@@ -96,11 +96,13 @@ services:
     networks:
       - edgedoc_net
 
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
+healthcheck:
+  # Vérifie que le serveur HTTP répond (200/302 attendus suivant config).
+  test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1"]
+  interval: 30s
+  timeout: 10s
+  retries: 5
+  start_period: 60s
 
 networks:
   edgedoc_net:

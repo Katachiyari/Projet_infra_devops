@@ -1,46 +1,101 @@
 version: "3.9"
 
 services:
+  # ===========================================================================
+  # Service : HedgeDoc (EdgeDoc)
+  # - Application web de documentation collaborative
+  # - Déployée derrière reverse-proxy (TLS terminé au proxy)
+  # - Doit être "aware" du HTTPS via X-Forwarded-Proto et paramètres HedgeDoc
+  # ===========================================================================
   edgedoc:
-    image: {{ edgedoc_image }}
+    image: "{{ edgedoc_image }}"
     container_name: edgedoc
     restart: unless-stopped
+
+    # Dépendance logique : la base doit être disponible
     depends_on:
       - edgedoc-db
+
+    # Exposition locale (backend) : reverse-proxy pointe ici
     ports:
       - "{{ edgedoc_port }}:3000"
+
     environment:
+      # -----------------------------------------------------------------------
+      # Mode d'exécution
+      # -----------------------------------------------------------------------
       - NODE_ENV=production
+
+      # -----------------------------------------------------------------------
+      # SSOT : domaine public
+      # -----------------------------------------------------------------------
       - CMD_DOMAIN={{ edgedoc_domain }}
-      - CMD_DB_URL=mysql://{{ edgedoc_db_user }}:{{ edgedoc_db_password }}@{{ edgedoc_db_host }}:{{ edgedoc_db_port }}/{{ edgedoc_db_name }}
+
+      # -----------------------------------------------------------------------
+      # Reverse-proxy / HTTPS
+      # - Résout les problèmes "Mixed Content" (liens/formulaires générés en HTTP)
+      # - HedgeDoc doit savoir qu'il est servi publiquement en HTTPS
+      # -----------------------------------------------------------------------
+      - CMD_PROTOCOL_USESSL={{ (edgedoc_scheme == 'https') | ternary('true','false') }}
+      - CMD_URL_ADDPORT=false
+
+      # HSTS (optionnel, recommandé en HTTPS)
+      - CMD_HSTS_ENABLE={{ (edgedoc_scheme == 'https') | ternary('true','false') }}
+
+      # -----------------------------------------------------------------------
+      # Base de données (MariaDB) : SSOT
+      # -----------------------------------------------------------------------
       - CMD_DB_DIALECT=mariadb
-      - CMD_ALLOW_ANONYMOUS=true
-      - CMD_ALLOW_ANONYMOUS_EDITS=true
-      - CMD_DEFAULT_PERMISSION=freely
-      - CMD_SESSION_SECRET=please-change-me
+      - CMD_DB_URL=mysql://{{ edgedoc_db_user }}:{{ edgedoc_db_password }}@{{ edgedoc_db_host }}:{{ edgedoc_db_port }}/{{ edgedoc_db_name }}
+
+      # -----------------------------------------------------------------------
+      # Politique d'accès (SSOT)
+      # -----------------------------------------------------------------------
+      - CMD_ALLOW_ANONYMOUS={{ edgedoc_allow_anonymous | ternary('true','false') }}
+      - CMD_ALLOW_ANONYMOUS_EDITS={{ edgedoc_allow_anonymous_edits | ternary('true','false') }}
+      - CMD_DEFAULT_PERMISSION={{ edgedoc_default_permission }}
+
+      # -----------------------------------------------------------------------
+      # Secret de session (DevSecOps) : Vault
+      # -----------------------------------------------------------------------
+      - CMD_SESSION_SECRET={{ edgedoc_session_secret }}
+
     volumes:
+      # Uploads persistants
       - "{{ edgedoc_install_dir }}/uploads:/hedgedoc/public/uploads"
+
     networks:
       - edgedoc_net
+
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/status || exit 1"]
+      # Vérifie l'état applicatif (observabilité minimale)
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/api/status || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
 
+  # ===========================================================================
+  # Service : MariaDB (backend)
+  # - Persistance sur disque hôte
+  # - Secrets fournis via Vault (DevSecOps)
+  # ===========================================================================
   edgedoc-db:
-    image: mariadb:10.11
+    image: "{{ mariadb_image }}"
     container_name: edgedoc-db
     restart: unless-stopped
+
     environment:
       - MARIADB_DATABASE={{ edgedoc_db_name }}
       - MARIADB_USER={{ edgedoc_db_user }}
       - MARIADB_PASSWORD={{ edgedoc_db_password }}
       - MARIADB_ROOT_PASSWORD={{ edgedoc_db_root_password }}
+
     volumes:
       - "{{ edgedoc_install_dir }}/db-data:/var/lib/mysql"
+
     networks:
       - edgedoc_net
+
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 30s

@@ -1,6 +1,6 @@
 ---
 # EdgeDoc role - Deploy via Docker
-
+#/home/katachiyari/Documents/Projet_infra_devops/Ansible/roles/edgedoc/tasks/main.yml
 - name: Create EdgeDoc directories
   ansible.builtin.file:
     path: "{{ item }}"

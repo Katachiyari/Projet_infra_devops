@@ -54,19 +54,7 @@
 # -----------------------------------------------------------------------------
 # 3) Volumes persistants GitLab.
 # -----------------------------------------------------------------------------
-- name: Créer répertoires volumes
-  ansible.builtin.file:
-    path: "/srv/gitlab/{{ item }}"
-    state: directory
-    mode: '0755'
-  loop:
-    - config
-    - logs
-    - data
-    - runner
-  become: true
-
-- name: Créer répertoires volumes
+- name: Créer répertoires volumes (SSOT)
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
@@ -77,6 +65,8 @@
     - "{{ gitlab_data_dir }}"
     - "{{ gitlab_runner_dir }}"
     - "{{ gitlab_runner_cache_dir }}"
+  become: true
+
 
 # -----------------------------------------------------------------------------
 # 4) Déploiement du docker-compose.yml.
@@ -99,7 +89,8 @@
     src: runner-config.toml.j2
     dest: "{{ gitlab_runner_config_dir }}/config.toml"
     mode: '0600'
-
+  notify: restart runner
+  become: true
 
 # -----------------------------------------------------------------------------
 # 6) Lancer / converger la stack GitLab via le module community.docker.

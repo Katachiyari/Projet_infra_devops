@@ -1,2 +1,13 @@
 ---
-# Handlers for EdgeDoc role
+# =============================================================================
+# Rôle : edgedoc
+# Fichier : roles/edgedoc/handlers/main.yml
+#
+# Objectif : redémarrer la stack en cas de changement de configuration.
+# =============================================================================
+
+- name: redémarrer edgedoc
+  community.docker.docker_compose_v2:
+    project_src: "{{ edgedoc_install_dir }}"
+    state: restarted
+  become: true

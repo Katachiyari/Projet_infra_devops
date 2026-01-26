@@ -4,49 +4,30 @@
 # Fichier : roles/edgedoc/defaults/main.yml
 #
 # Objectif :
-# - Déployer HedgeDoc (EdgeDoc) derrière reverse-proxy HTTPS
-# - Centraliser la configuration (SSOT)
-# - Renforcer la sécurité (DevSecOps) via Ansible Vault
-# - Assurer la reproductibilité (pinning des images)
+# - Déployer HedgeDoc (EdgeDoc) + MariaDB via Docker Compose
+# - Appliquer une configuration SSOT (Source Unique de Vérité)
+# - Éviter les secrets en clair (DevSecOps) : Vault obligatoire
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# Emplacement d'installation sur l'hôte (SSOT)
+# SSOT (Source Unique de Vérité) : paramètres d'exposition
 # -----------------------------------------------------------------------------
 edgedoc_install_dir: "/opt/edgedoc"
-
-# -----------------------------------------------------------------------------
-# Accès public (SSOT)
-# - edgedoc_domain : FQDN exposé via reverse-proxy
-# - edgedoc_scheme : schéma public (https recommandé)
-# -----------------------------------------------------------------------------
-edgedoc_domain: "edgedoc.lab.local"
+edgedoc_port: 8080
+edgedoc_fqdn: "edgedoc.lab.local"
 edgedoc_scheme: "https"
 
 # -----------------------------------------------------------------------------
-# Réseau / ports
-# - edgedoc_port : port exposé localement sur la VM EdgeDoc
-#   (le reverse-proxy doit pointer dessus)
-# -----------------------------------------------------------------------------
-edgedoc_port: 8080
-
-# -----------------------------------------------------------------------------
-# Images Docker (reproductibilité)
-# - Interdiction pratique d'utiliser :latest (non déterministe)
+# Images Docker (reproductibilité) : versions pinées
+# NOTE : DHI (Docker Hardened Images) :
+# - À ce jour, pas de DHI “officielle” standard pour HedgeDoc/MariaDB dans ce projet.
+# - On privilégie donc les images officielles amont + versions pinées.
 # -----------------------------------------------------------------------------
 edgedoc_image: "quay.io/hedgedoc/hedgedoc:1.9.9"
 mariadb_image: "mariadb:10.11"
 
 # -----------------------------------------------------------------------------
-# Configuration applicative HedgeDoc (SSOT fonctionnelle)
-# - Évite le hardcode dans docker-compose
-# -----------------------------------------------------------------------------
-edgedoc_allow_anonymous: true
-edgedoc_allow_anonymous_edits: true
-edgedoc_default_permission: "freely"
-
-# -----------------------------------------------------------------------------
-# Base de données MariaDB (backend)
+# Backend base de données (réseau Docker interne)
 # -----------------------------------------------------------------------------
 edgedoc_db_host: "edgedoc-db"
 edgedoc_db_port: 3306
@@ -54,10 +35,15 @@ edgedoc_db_name: "hedgedoc"
 edgedoc_db_user: "hedgedoc"
 
 # -----------------------------------------------------------------------------
-# Secrets (DevSecOps)
-# - Doivent provenir d'Ansible Vault
-# - Jamais de valeur sensible en clair dans defaults/
+# Secrets (doivent venir d'Ansible Vault) - OBLIGATOIRE
 # -----------------------------------------------------------------------------
 edgedoc_db_password: "{{ vault_edgedoc_db_password }}"
 edgedoc_db_root_password: "{{ vault_edgedoc_db_root_password }}"
 edgedoc_session_secret: "{{ vault_edgedoc_session_secret }}"
+
+# -----------------------------------------------------------------------------
+# Paramètres fonctionnels (SSOT) - évite le hardcoding dans le compose
+# -----------------------------------------------------------------------------
+edgedoc_allow_anonymous: true
+edgedoc_allow_anonymous_edits: true
+edgedoc_default_permission: "freely"

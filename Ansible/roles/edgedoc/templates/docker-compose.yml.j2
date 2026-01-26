@@ -1,83 +1,82 @@
-version: "3.9"
+---
+# =============================================================================
+# Rôle : edgedoc
+# Fichier : roles/edgedoc/templates/docker-compose.yml.j2
+#
+# Objectif :
+# - Déployer HedgeDoc + MariaDB via Docker Compose
+# - Reproductibilité : images pinées
+# - DevSecOps : secrets via Vault + options de durcissement raisonnables
+# - Santé : healthcheck fiable (ne dépend pas d'un endpoint non garanti)
+# =============================================================================
 
 services:
   # ===========================================================================
-  # Service : HedgeDoc (EdgeDoc)
-  # - Application web de documentation collaborative
-  # - Déployée derrière reverse-proxy (TLS terminé au proxy)
-  # - Doit être "aware" du HTTPS via X-Forwarded-Proto et paramètres HedgeDoc
+  # Service : edgedoc (HedgeDoc)
   # ===========================================================================
   edgedoc:
     image: "{{ edgedoc_image }}"
     container_name: edgedoc
     restart: unless-stopped
-
-    # Dépendance logique : la base doit être disponible
     depends_on:
       - edgedoc-db
 
-    # Exposition locale (backend) : reverse-proxy pointe ici
+    # Publication du service : SSOT (port hôte configurable)
     ports:
       - "{{ edgedoc_port }}:3000"
 
     environment:
       # -----------------------------------------------------------------------
-      # Mode d'exécution
+      # Configuration applicative (HedgeDoc)
+      # Référence : variables CMD_* de HedgeDoc
       # -----------------------------------------------------------------------
       - NODE_ENV=production
+      - CMD_DOMAIN={{ edgedoc_fqdn }}
 
-      # -----------------------------------------------------------------------
-      # SSOT : domaine public
-      # -----------------------------------------------------------------------
-      - CMD_DOMAIN={{ edgedoc_domain }}
-
-      # -----------------------------------------------------------------------
-      # Reverse-proxy / HTTPS
-      # - Résout les problèmes "Mixed Content" (liens/formulaires générés en HTTP)
-      # - HedgeDoc doit savoir qu'il est servi publiquement en HTTPS
-      # -----------------------------------------------------------------------
-      - CMD_PROTOCOL_USESSL={{ (edgedoc_scheme == 'https') | ternary('true','false') }}
-      - CMD_URL_ADDPORT=false
-
-      # HSTS (optionnel, recommandé en HTTPS)
-      - CMD_HSTS_ENABLE={{ (edgedoc_scheme == 'https') | ternary('true','false') }}
-
-      # -----------------------------------------------------------------------
-      # Base de données (MariaDB) : SSOT
-      # -----------------------------------------------------------------------
-      - CMD_DB_DIALECT=mariadb
+      # Base de données MariaDB (réseau interne docker)
       - CMD_DB_URL=mysql://{{ edgedoc_db_user }}:{{ edgedoc_db_password }}@{{ edgedoc_db_host }}:{{ edgedoc_db_port }}/{{ edgedoc_db_name }}
+      - CMD_DB_DIALECT=mariadb
 
-      # -----------------------------------------------------------------------
       # Politique d'accès (SSOT)
-      # -----------------------------------------------------------------------
-      - CMD_ALLOW_ANONYMOUS={{ edgedoc_allow_anonymous | ternary('true','false') }}
-      - CMD_ALLOW_ANONYMOUS_EDITS={{ edgedoc_allow_anonymous_edits | ternary('true','false') }}
+      - CMD_ALLOW_ANONYMOUS={{ edgedoc_allow_anonymous | lower }}
+      - CMD_ALLOW_ANONYMOUS_EDITS={{ edgedoc_allow_anonymous_edits | lower }}
       - CMD_DEFAULT_PERMISSION={{ edgedoc_default_permission }}
 
-      # -----------------------------------------------------------------------
-      # Secret de session (DevSecOps) : Vault
-      # -----------------------------------------------------------------------
+      # Secret de session (Vault)
       - CMD_SESSION_SECRET={{ edgedoc_session_secret }}
 
     volumes:
-      # Uploads persistants
+      # Uploads persistants (hôte -> conteneur)
       - "{{ edgedoc_install_dir }}/uploads:/hedgedoc/public/uploads"
 
     networks:
       - edgedoc_net
 
+    # -------------------------------------------------------------------------
+    # Durcissement basique (best effort)
+    # NOTE :
+    # - read_only et tmpfs peuvent casser certaines images si elles écrivent ailleurs.
+    # - On applique un minimum “safe” ; ajuster si besoin selon comportement image.
+    # -------------------------------------------------------------------------
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+    # -------------------------------------------------------------------------
+    # Healthcheck (robuste)
+    # /api/status peut renvoyer 404 selon versions/config ; on valide donc "/".
+    # Utilisation de wget (souvent présent) plutôt que curl.
+    # -------------------------------------------------------------------------
     healthcheck:
-      # Vérifie l'état applicatif (observabilité minimale)
-      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/api/status || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 60s
 
   # ===========================================================================
-  # Service : MariaDB (backend)
-  # - Persistance sur disque hôte
-  # - Secrets fournis via Vault (DevSecOps)
+  # Service : edgedoc-db (MariaDB)
   # ===========================================================================
   edgedoc-db:
     image: "{{ mariadb_image }}"
@@ -85,24 +84,28 @@ services:
     restart: unless-stopped
 
     environment:
+      # Base + utilisateur applicatif
       - MARIADB_DATABASE={{ edgedoc_db_name }}
       - MARIADB_USER={{ edgedoc_db_user }}
       - MARIADB_PASSWORD={{ edgedoc_db_password }}
+
+      # Root DB (Vault)
       - MARIADB_ROOT_PASSWORD={{ edgedoc_db_root_password }}
 
     volumes:
+      # Données persistantes DB
       - "{{ edgedoc_install_dir }}/db-data:/var/lib/mysql"
 
     networks:
       - edgedoc_net
 
-healthcheck:
-  # Vérifie que le serveur HTTP répond (200/302 attendus suivant config).
-  test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1"]
-  interval: 30s
-  timeout: 10s
-  retries: 5
-  start_period: 60s
+    # Healthcheck DB : ping MariaDB local
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
 networks:
   edgedoc_net:

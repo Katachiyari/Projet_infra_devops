@@ -1,7 +1,33 @@
 ---
-# EdgeDoc role - Deploy via Docker
-#/home/katachiyari/Documents/Projet_infra_devops/Ansible/roles/edgedoc/tasks/main.yml
-- name: Create EdgeDoc directories
+# =============================================================================
+# Rôle : edgedoc
+# Fichier : roles/edgedoc/tasks/main.yml
+#
+# Objectif :
+# - Préparer les répertoires persistants
+# - Déployer le docker-compose.yml (template)
+# - Converger la stack via community.docker.docker_compose_v2 (idempotence)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Pré-flight : vérifier la présence des secrets Vault attendus
+# -----------------------------------------------------------------------------
+- name: Vérifier que les secrets Vault EdgeDoc sont définis
+  ansible.builtin.assert:
+    that:
+      - vault_edgedoc_db_password is defined
+      - vault_edgedoc_db_root_password is defined
+      - vault_edgedoc_session_secret is defined
+    fail_msg: >
+      Secrets Vault manquants. Définir :
+      vault_edgedoc_db_password, vault_edgedoc_db_root_password,
+      vault_edgedoc_session_secret (dans group_vars/all/vault.yml).
+  become: true
+
+# -----------------------------------------------------------------------------
+# Répertoires persistants
+# -----------------------------------------------------------------------------
+- name: Créer les répertoires EdgeDoc (SSOT)
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
@@ -10,8 +36,13 @@
     - "{{ edgedoc_install_dir }}"
     - "{{ edgedoc_install_dir }}/uploads"
     - "{{ edgedoc_install_dir }}/db-data"
+  become: true
 
-- name: Ensure uploads directory ownership (UID 1000)
+# -----------------------------------------------------------------------------
+# Permissions : certains conteneurs écrivent avec des UID/GID spécifiques.
+# Ici, on garde ton approche, en l'encadrant.
+# -----------------------------------------------------------------------------
+- name: Assurer les permissions du répertoire uploads (UID 1000)
   ansible.builtin.file:
     path: "{{ edgedoc_install_dir }}/uploads"
     state: directory
@@ -19,8 +50,9 @@
     group: 1000
     mode: "0775"
     recurse: true
+  become: true
 
-- name: Ensure MariaDB data directory ownership (UID 999)
+- name: Assurer les permissions du répertoire DB (UID 999)
   ansible.builtin.file:
     path: "{{ edgedoc_install_dir }}/db-data"
     state: directory
@@ -28,22 +60,32 @@
     group: 999
     mode: "0755"
     recurse: true
+  become: true
 
-- name: Deploy EdgeDoc Docker Compose
+# -----------------------------------------------------------------------------
+# Déploiement du Compose (template)
+# -----------------------------------------------------------------------------
+- name: Déployer docker-compose.yml EdgeDoc
   ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ edgedoc_install_dir }}/docker-compose.yml"
     owner: root
     group: root
     mode: "0644"
+  notify: redémarrer edgedoc
+  become: true
 
-- name: Deploy or update EdgeDoc stack
+# -----------------------------------------------------------------------------
+# Convergence idempotente de la stack
+# -----------------------------------------------------------------------------
+- name: Déployer / mettre à jour la stack EdgeDoc (Compose piloté par Ansible)
   community.docker.docker_compose_v2:
     project_src: "{{ edgedoc_install_dir }}"
     state: present
     pull: missing
   register: edgedoc_result
+  become: true
 
-- name: Show EdgeDoc deployment result
+- name: Afficher le résultat du déploiement EdgeDoc
   ansible.builtin.debug:
     var: edgedoc_result

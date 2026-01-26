@@ -13,7 +13,7 @@ nginx_rp_backends:
     port: 9000
   gitlab:
     host: "172.16.100.40"
-    port: 80
+    port: 8181
   gitlab_registry:
     host: "172.16.100.40"
     port: 5050

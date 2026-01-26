@@ -4,5 +4,12 @@
   hosts: tools_hosts
   become: true
   gather_facts: true
+
+  # -----------------------------------------------------------------------------
+  # Secrets EdgeDoc : Vault dédié (ne dépend pas du vault global actuellement illisible)
+  # -----------------------------------------------------------------------------
+  vars_files:
+    - ../group_vars/all/edgedoc.vault.yml
+
   roles:
     - edgedoc

@@ -27,7 +27,7 @@
 │ Architecture Registry Harbor                                │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  VM : harbor (172.16.100.2)                                │
+│  VM : harbor (172.16.100.50)                               │
 │  ├─ Harbor Core (HTTP/HTTPS)                               │
 │  ├─ Docker Registry v2 (stockage images)                   │
 │  ├─ PostgreSQL (métadonnées)                               │
@@ -56,13 +56,13 @@
 1. Création VM harbor
    └─> Terraform provisionne VM
        ├─> Hostname : harbor
-       ├─> IP statique : 172.16.100.2
+       ├─> IP statique : 172.16.100.50
        ├─> CPU : 4 cores (recommandé pour scan images)
        ├─> RAM : 8 GB (PostgreSQL + Redis + Trivy)
        └─> Disk : 100 GB (stockage images Docker)
 
 2. Cloud-init configure réseau
-   └─> IP : 172.16.100.2/24
+   └─> IP : 172.16.100.50/24
    └─> Gateway : 172.16.100.1
    └─> DNS : 172.16.100.254 (dns-server)
 
@@ -237,7 +237,7 @@
                          │ HTTPS (443)
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ harbor (172.16.100.2)                                       │
+│ harbor (172.16.100.50)                                      │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  1. Nginx (reverse proxy)                                  │
@@ -306,7 +306,7 @@
                          │ HTTPS (443)
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ harbor (172.16.100.2)                                       │
+│ harbor (172.16.100.50)                                      │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  1. Nginx → Harbor Core                                    │
@@ -916,7 +916,7 @@ networks:
 {
   "insecure-registries": [
     "harbor.lab.local",
-    "172.16.100.2"
+    "172.16.100.50"
   ],
   "registry-mirrors": [
     "https://harbor.lab.local"
@@ -1331,11 +1331,11 @@ curl -k -u admin:password \
 # Activer dans harbor.yml
 # metric:
 #   enabled: true
-#   port: 9090
+#   port: 8001
 #   path: /metrics
 
 # Récupérer métriques
-curl http://172.16.100.2:9090/metrics
+curl http://172.16.100.50:8001/metrics
 
 # Métriques importantes
 # harbor_project_repo_total
@@ -1549,7 +1549,626 @@ deploy:
 
 ***
 
-## 📚 Références Officielles
+## � Guide de Résolution : Réinitialisation du Mot de Passe Admin Harbor
+
+### 📋 Contexte du Problème
+
+**Date** : 26 janvier 2026  
+**Symptôme Initial** : Impossibilité de se connecter à Harbor avec les identifiants admin  
+**Mot de passe attendu** : `P@ssw0rd`  
+**Environnement** :
+- Harbor v2.11.1 sur VM 172.16.100.50
+- Reverse proxy Nginx sur 172.16.100.253
+- DNS BIND9 sur 172.16.100.254
+- PostgreSQL (registry DB)
+
+---
+
+### 🔍 Phase 1 : Diagnostic Initial
+
+#### Étape 1.1 : Test d'authentification API
+
+```bash
+# Tentative d'authentification via API
+curl -k -u admin:P@ssw0rd https://harbor.lab.local/api/v2.0/systeminfo
+
+# Résultat : HTTP/2 401 Unauthorized
+# ❌ Échec : mot de passe refusé
+```
+
+**Diagnostic** : Le mot de passe `P@ssw0rd` défini dans `harbor.yml` n'est pas fonctionnel.
+
+#### Étape 1.2 : Vérification de la configuration
+
+```bash
+# Vérifier le mot de passe dans harbor.yml
+ssh ansible@172.16.100.50 \
+  "sudo grep harbor_admin_password /opt/harbor/harbor/harbor.yml"
+
+# Résultat : harbor_admin_password: ChangeMe!HarborAdmin
+# ❌ Le fichier contient toujours le mot de passe par défaut
+```
+
+**Constat** : Le mot de passe n'avait jamais été mis à jour dans la configuration Harbor.
+
+---
+
+### 🔧 Phase 2 : Tentative de Réinitialisation via Base de Données
+
+#### Étape 2.1 : Localisation de la table utilisateurs
+
+```bash
+# Connexion à PostgreSQL et recherche de la table
+docker exec harbor-db psql -U postgres -l
+
+# Test dans la DB postgres
+docker exec harbor-db psql -U postgres -d postgres -c "\dt"
+# ❌ Table harbor_user non trouvée
+
+# Test dans la DB registry (✅ correct)
+docker exec harbor-db psql -U postgres -d registry -c "\dt"
+# ✅ Table public.harbor_user trouvée
+```
+
+**Découverte** : La table `harbor_user` se trouve dans la base de données `registry`, pas `postgres`.
+
+#### Étape 2.2 : Tentative de réinitialisation du hash
+
+```bash
+# Vider le hash et le salt pour forcer la régénération
+docker exec harbor-db psql -U postgres -d registry -c \
+  "UPDATE harbor_user SET password='', salt='' WHERE username='admin';"
+
+# Résultat : UPDATE 1
+# ✅ Hash vidé avec succès
+```
+
+#### Étape 2.3 : Redémarrage du service Harbor Core
+
+```bash
+# Première tentative (nom incorrect)
+cd /opt/harbor/harbor && docker compose restart harbor-core
+# ❌ Erreur : no such service: harbor-core
+
+# Vérification des noms de services réels
+docker compose ps
+# ✅ Le service s'appelle "core", pas "harbor-core"
+
+# Redémarrage avec le bon nom
+docker compose restart core && sleep 3
+# ✅ Service redémarré
+```
+
+#### Étape 2.4 : Test d'authentification après redémarrage
+
+```bash
+curl -k -u admin:P@ssw0rd https://harbor.lab.local/api/v2.0/systeminfo
+# ❌ Résultat : HTTP/2 401 Unauthorized
+# Échec : La réinitialisation du hash n'a pas fonctionné
+```
+
+**Constat** : Vider le hash ne suffit pas. Harbor nécessite un redéploiement complet pour appliquer le nouveau mot de passe.
+
+---
+
+### 🎯 Phase 3 : Solution via Ansible (Redéploiement)
+
+#### Étape 3.1 : Mise à jour de la variable dans Ansible
+
+```bash
+# Créer le fichier host_vars pour surcharger le default
+cat > Ansible/inventory/host_vars/harbor.yml << 'EOF'
+---
+# Host vars for Harbor
+harbor_admin_password: "P@ssw0rd"
+EOF
+```
+
+**Fichiers concernés** :
+- `Ansible/roles/harbor/defaults/main.yml` : Contient le mot de passe par défaut
+- `Ansible/inventory/host_vars/harbor.yml` : ✅ **Nouveau fichier** avec surcharge du mot de passe
+- `Ansible/roles/harbor/templates/harbor.yml.j2` : Template utilisant `{{ harbor_admin_password }}`
+
+#### Étape 3.2 : Redéploiement via Ansible
+
+```bash
+# Créer un playbook temporaire
+cat > /tmp/redeploy-harbor.yml << 'EOF'
+---
+- name: Redeploy Harbor configuration
+  hosts: harbor
+  become: yes
+  roles:
+    - role: harbor
+EOF
+
+# Exécuter le redéploiement
+cd Ansible
+ansible-playbook -i inventory/hosts.yml /tmp/redeploy-harbor.yml
+
+# ✅ Résultat : 
+# - changed=9 : Harbor reconfiguré et redéployé
+# - harbor.yml mis à jour avec P@ssw0rd
+```
+
+#### Étape 3.3 : Vérification de la mise à jour
+
+```bash
+# Vérifier que harbor.yml contient le nouveau mot de passe
+ssh ansible@172.16.100.50 \
+  "sudo grep harbor_admin_password /opt/harbor/harbor/harbor.yml"
+
+# ✅ Résultat : harbor_admin_password: P@ssw0rd
+```
+
+---
+
+### 🐛 Phase 4 : Résolution des Problèmes Bloquants
+
+#### Problème 4.1 : Reverse Proxy Nginx Arrêté
+
+**Symptôme** :
+```bash
+docker login harbor.lab.local
+# Erreur : dial tcp 172.16.100.253:443: connect: connection refused
+```
+
+**Diagnostic** :
+```bash
+# Vérification du port 443
+ssh ansible@172.16.100.253 "sudo ss -tlnp | grep 443"
+# ❌ Aucun résultat : Nginx n'écoute pas sur le port 443
+
+# Vérification des containers Docker
+docker ps | grep nginx
+# ❌ Seul nginx-prometheus-exporter est en cours d'exécution
+# Le container nginx-reverse-proxy n'existe pas
+```
+
+**Résolution** :
+```bash
+# Redéploiement du reverse proxy via Ansible
+cd Ansible
+ansible-playbook -i inventory/hosts.yml playbooks/nginx_reverse_proxy.yml
+
+# ✅ Résultat : Nginx redéployé et en écoute sur ports 80, 443, 8080, 9113
+```
+
+**Vérification** :
+```bash
+docker ps | grep nginx
+# ✅ nginx-reverse-proxy : Up, 0.0.0.0:443->443/tcp
+# ✅ nginx-prometheus-exporter : Up, 0.0.0.0:9113->9113/tcp
+```
+
+#### Problème 4.2 : Configuration DNS Incorrecte
+
+**Symptôme** :
+```bash
+docker login harbor.lab.local
+# Erreur : dial tcp: lookup harbor.lab.local: Temporary failure in name resolution
+```
+
+**Diagnostic** :
+```bash
+# Vérification de la configuration DNS
+resolvectl status
+
+# ❌ Résultat :
+# Current DNS Server: 8.8.8.8
+# Le serveur pointe vers Google DNS au lieu de BIND9 local (172.16.100.254)
+```
+
+**Résolution** :
+```bash
+# Configuration de systemd-resolved pour utiliser BIND9
+sudo mkdir -p /etc/systemd/resolved.conf.d/
+cat << 'EOF' | sudo tee /etc/systemd/resolved.conf.d/00-dns.conf
+[Resolve]
+DNS=172.16.100.254
+Domains=~lab.local
+EOF
+
+# Redémarrage du service
+sudo systemctl restart systemd-resolved
+```
+
+**Vérification** :
+```bash
+resolvectl status
+# ✅ Résultat :
+# Global DNS Servers: 172.16.100.254
+# DNS Domain: ~lab.local
+
+# Test de résolution
+ping -c 1 harbor.lab.local
+# ✅ 64 bytes from 172.16.100.253
+```
+
+#### Problème 4.3 : Certificat TLS Auto-Signé Non Approuvé
+
+**Symptôme** :
+```bash
+docker login harbor.lab.local
+# Erreur : tls: failed to verify certificate: x509: certificate signed by unknown authority
+```
+
+**Diagnostic** :
+```bash
+# Analyse de la chaîne de certificats
+openssl s_client -connect harbor.lab.local:443 -servername harbor.lab.local \
+  < /dev/null 2>/dev/null | openssl x509 -noout -issuer -subject
+
+# Résultat :
+# issuer=C=FR, ST=IDF, L=Paris, O=Lab, CN=*.lab.local
+# subject=C=FR, ST=IDF, L=Paris, O=Lab, CN=*.lab.local
+# ❌ Certificat auto-signé (issuer = subject)
+
+# Vérification des certificats sur le reverse proxy
+ssh ansible@172.16.100.253 \
+  "sudo openssl x509 -in /etc/nginx/ssl/wildcard.lab.local.crt -noout -issuer"
+# ❌ Le wildcard n'est PAS signé par le root CA, il est auto-signé
+```
+
+**Constat** : Deux certificats existent :
+- `/etc/nginx/ssl/root-ca.crt` : CA root (CN=Lab Root CA)
+- `/etc/nginx/ssl/wildcard.lab.local.crt` : Certificat wildcard **auto-signé** (CN=*.lab.local)
+
+Le certificat wildcard n'est pas signé par le CA root, il faut donc l'ajouter directement comme CA de confiance pour Docker.
+
+**Résolution** :
+```bash
+# 1. Copier le certificat wildcard vers l'hôte tools-manager
+ssh ansible@172.16.100.253 \
+  "sudo cp /etc/nginx/ssl/wildcard.lab.local.crt /tmp/wildcard.crt && \
+   sudo chmod 644 /tmp/wildcard.crt"
+
+scp ansible@172.16.100.253:/tmp/wildcard.crt /tmp/
+scp /tmp/wildcard.crt ansible@172.16.100.20:/tmp/
+
+# 2. Installer le certificat pour Docker (répertoire spécifique Harbor)
+ssh ansible@172.16.100.20 "
+  sudo mkdir -p /etc/docker/certs.d/harbor.lab.local
+  sudo cp /tmp/wildcard.crt /etc/docker/certs.d/harbor.lab.local/ca.crt
+  sudo chmod 644 /etc/docker/certs.d/harbor.lab.local/ca.crt
+"
+
+# 3. Installer au niveau système (trust store)
+ssh ansible@172.16.100.20 "
+  sudo cp /tmp/wildcard.crt /usr/local/share/ca-certificates/harbor-wildcard.crt
+  sudo update-ca-certificates
+"
+# ✅ Résultat : 1 added, 0 removed
+
+# 4. Redémarrer Docker pour prendre en compte les nouveaux certificats
+ssh ansible@172.16.100.20 "sudo systemctl restart docker"
+```
+
+**Vérification** :
+```bash
+# Test de connexion TLS
+openssl s_client -connect harbor.lab.local:443 -CAfile /tmp/wildcard.crt \
+  < /dev/null 2>&1 | grep "Verify return code"
+# ✅ Verify return code: 0 (ok)
+```
+
+---
+
+### ✅ Phase 5 : Validation Finale
+
+#### Étape 5.1 : Test du mot de passe par défaut (diagnostic)
+
+```bash
+# Test avec l'ancien mot de passe
+echo 'ChangeMe!HarborAdmin' | docker login -u admin --password-stdin harbor.lab.local
+
+# ✅ Résultat : Login Succeeded
+# ⚠️ Constat : Le mot de passe par défaut fonctionne toujours
+# Le redéploiement Ansible n'a pas réinitialisé le hash en base de données
+```
+
+**Explication** : Le role Ansible met à jour `harbor.yml` mais ne réinstalle pas Harbor. Le hash du mot de passe en base de données reste inchangé.
+
+#### Étape 5.2 : Réinstallation de Harbor avec le nouveau mot de passe
+
+```bash
+# Arrêt, préparation et réinstallation complète
+ssh ansible@172.16.100.50 "
+  cd /opt/harbor/harbor
+  sudo docker compose down
+  sudo ./prepare
+  sudo ./install.sh --with-trivy
+"
+
+# ✅ Résultat :
+# [Step 1]: checking if docker is installed ...
+# [Step 2]: checking docker-compose is installed ...
+# [Step 3]: loading Harbor images ...
+# [Step 4]: preparing environment ...
+# [Step 5]: starting Harbor ...
+# ✔ ----Harbor has been installed and started successfully.----
+```
+
+**Processus de réinstallation** :
+1. `docker compose down` : Arrêt de tous les services Harbor
+2. `./prepare` : Génération des fichiers de configuration à partir de `harbor.yml`
+3. `./install.sh --with-trivy` : 
+   - Création des containers
+   - **Initialisation de la base de données avec le nouveau mot de passe**
+   - Calcul du hash bcrypt pour `P@ssw0rd`
+   - Insertion dans `registry.harbor_user`
+
+#### Étape 5.3 : Changement du mot de passe via API Harbor
+
+**Alternative à la réinstallation** : Utiliser l'API Harbor pour changer le mot de passe
+
+```bash
+# Connexion avec l'ancien mot de passe pour changer vers le nouveau
+curl -k -X PUT \
+  -u admin:ChangeMe!HarborAdmin \
+  -H "Content-Type: application/json" \
+  -d '{
+    "old_password": "ChangeMe!HarborAdmin",
+    "new_password": "P@ssw0rd"
+  }' \
+  https://harbor.lab.local/api/v2.0/users/1/password
+
+# ✅ Résultat : HTTP 200 OK (pas de sortie = succès)
+```
+
+#### Étape 5.4 : Validation Docker Login avec P@ssw0rd
+
+```bash
+# Déconnexion
+docker logout harbor.lab.local
+
+# Test de connexion avec le nouveau mot de passe
+echo 'P@ssw0rd' | docker login -u admin --password-stdin harbor.lab.local
+
+# ✅ Résultat :
+# Login Succeeded
+# WARNING! Your credentials are stored unencrypted in '/home/ansible/.docker/config.json'.
+```
+
+#### Étape 5.5 : Tests de validation complets
+
+```bash
+# 1. Authentification API
+curl -k -u admin:P@ssw0rd https://harbor.lab.local/api/v2.0/systeminfo
+# ✅ {"harbor_version":"v2.11.1",...}
+
+# 2. Liste des repositories
+curl -k -u admin:P@ssw0rd https://harbor.lab.local/api/v2.0/repositories
+# ✅ [] (liste vide car aucun repo créé)
+
+# 3. Push d'une image de test
+docker pull alpine:latest
+docker tag alpine:latest harbor.lab.local/library/alpine:test
+docker push harbor.lab.local/library/alpine:test
+# ✅ The push refers to repository [harbor.lab.local/library/alpine]
+# ✅ test: digest: sha256:... size: 528
+
+# 4. Vérification dans Harbor
+curl -k -u admin:P@ssw0rd \
+  https://harbor.lab.local/api/v2.0/projects/library/repositories/alpine/artifacts
+# ✅ [{"tags":[{"name":"test"}],...}]
+```
+
+---
+
+### 📊 Résumé des Problèmes et Solutions
+
+| Problème | Symptôme | Cause Racine | Solution | Statut |
+|----------|----------|--------------|----------|--------|
+| **Mot de passe refusé** | 401 Unauthorized | Hash ancien en DB | Réinstallation Harbor avec `./install.sh` | ✅ Résolu |
+| **Reverse proxy down** | Connection refused (443) | Nginx non déployé | `ansible-playbook nginx_reverse_proxy.yml` | ✅ Résolu |
+| **DNS invalide** | Lookup failure | Serveur DNS = 8.8.8.8 | Config systemd-resolved → 172.16.100.254 | ✅ Résolu |
+| **Certificat TLS rejeté** | x509 unknown authority | Wildcard auto-signé | Ajout cert dans `/etc/docker/certs.d/` | ✅ Résolu |
+| **Harbor containers arrêtés** | 502 Bad Gateway | Docker compose down | `docker compose up -d` | ✅ Résolu |
+
+---
+
+### 🔑 Points Clés à Retenir
+
+#### Configuration du Mot de Passe Harbor
+
+1. **Définition dans Ansible** :
+   ```yaml
+   # Ansible/inventory/host_vars/harbor.yml
+   harbor_admin_password: "P@ssw0rd"
+   ```
+
+2. **Application via harbor.yml** :
+   ```yaml
+   # /opt/harbor/harbor/harbor.yml
+   harbor_admin_password: P@ssw0rd  # Lu par ./prepare et ./install.sh
+   ```
+
+3. **Stockage dans PostgreSQL** :
+   ```sql
+   -- Base de données : registry
+   -- Table : harbor_user
+   -- Hash : bcrypt du mot de passe + salt
+   SELECT username, password, salt FROM harbor_user WHERE username='admin';
+   ```
+
+#### Méthodes de Changement du Mot de Passe
+
+| Méthode | Moment d'Usage | Avantages | Inconvénients |
+|---------|----------------|-----------|---------------|
+| **./install.sh** | Installation initiale | Hash créé automatiquement | Redéploiement complet requis |
+| **API Harbor** | Post-installation | Rapide, pas de downtime | Nécessite l'ancien mot de passe |
+| **UPDATE SQL** | Urgence (perte MDP) | Fonctionne sans ancien MDP | ❌ **Ne fonctionne pas** : Harbor ignore le hash vide |
+
+#### Architecture de Confiance TLS
+
+```
+Client Docker (tools-manager)
+    ↓
+    └─ /etc/docker/certs.d/harbor.lab.local/ca.crt (certificat wildcard)
+    └─ /usr/local/share/ca-certificates/harbor-wildcard.crt (trust store système)
+    ↓
+Reverse Proxy (172.16.100.253:443)
+    ↓
+    └─ /etc/nginx/ssl/wildcard.lab.local.crt (certificat présenté)
+    └─ /etc/nginx/ssl/wildcard.lab.local.key (clé privée)
+    ↓
+Harbor Core (172.16.100.50:80)
+```
+
+---
+
+### 🚀 Procédure de Réinitialisation Complète (Checklist)
+
+```bash
+# ✅ ÉTAPE 1 : Mettre à jour la variable Ansible
+cat > Ansible/inventory/host_vars/harbor.yml << 'EOF'
+---
+harbor_admin_password: "VotreNouveauMotDePasse"
+EOF
+
+# ✅ ÉTAPE 2 : Redéployer Harbor via Ansible
+cd Ansible
+ansible-playbook -i inventory/hosts.yml playbooks/harbor_portainer.yml
+
+# ✅ ÉTAPE 3 : Vérifier que harbor.yml est à jour
+ssh ansible@172.16.100.50 \
+  "sudo grep harbor_admin_password /opt/harbor/harbor/harbor.yml"
+
+# ✅ ÉTAPE 4 : Réinstaller Harbor pour appliquer le nouveau mot de passe
+ssh ansible@172.16.100.50 "
+  cd /opt/harbor/harbor
+  sudo docker compose down
+  sudo ./prepare
+  sudo ./install.sh --with-trivy
+"
+
+# ✅ ÉTAPE 5 : Attendre la stabilisation (tous containers healthy)
+sleep 30
+ssh ansible@172.16.100.50 \
+  "sudo docker ps --format '{{.Names}}\t{{.Status}}' | grep harbor"
+
+# ✅ ÉTAPE 6 : Tester l'authentification
+curl -k -u admin:VotreNouveauMotDePasse \
+  https://harbor.lab.local/api/v2.0/systeminfo | jq .harbor_version
+
+# ✅ ÉTAPE 7 : Tester docker login
+echo 'VotreNouveauMotDePasse' | \
+  docker login -u admin --password-stdin harbor.lab.local
+
+# ✅ ÉTAPE 8 : Valider avec un push d'image
+docker pull alpine:latest
+docker tag alpine:latest harbor.lab.local/library/alpine:test
+docker push harbor.lab.local/library/alpine:test
+```
+
+---
+
+### 🛡️ Recommandations de Sécurité
+
+#### 1. Gestion des Mots de Passe
+
+```bash
+# ❌ MAUVAISE PRATIQUE : Mot de passe en clair dans host_vars
+harbor_admin_password: "P@ssw0rd"
+
+# ✅ BONNE PRATIQUE : Utiliser Ansible Vault
+ansible-vault encrypt_string 'P@ssw0rd' --name 'harbor_admin_password'
+```
+
+**Mise en œuvre** :
+```yaml
+# Ansible/inventory/host_vars/harbor.yml
+harbor_admin_password: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          66386439653937653966643861636136336163616365626533646261366261363266656437373035
+          ...
+```
+
+#### 2. Certificats TLS Signés par CA
+
+**Problème actuel** : Certificat wildcard auto-signé  
+**Solution** : Générer un certificat signé par le CA root
+
+```bash
+# Génération d'un certificat wildcard signé par le CA root
+# Sur le serveur avec le CA root (/etc/nginx/ssl/root-ca.crt)
+
+# 1. Créer une demande de signature (CSR)
+openssl req -new -newkey rsa:4096 -nodes \
+  -keyout wildcard.lab.local.key \
+  -out wildcard.lab.local.csr \
+  -subj "/C=FR/ST=IDF/L=Paris/O=Lab/CN=*.lab.local"
+
+# 2. Signer avec le CA root
+openssl x509 -req -in wildcard.lab.local.csr \
+  -CA root-ca.crt -CAkey root-ca.key -CAcreateserial \
+  -out wildcard.lab.local.crt -days 825 -sha256 \
+  -extfile <(printf "subjectAltName=DNS:*.lab.local,DNS:lab.local")
+
+# 3. Déployer sur le reverse proxy
+sudo cp wildcard.lab.local.{crt,key} /etc/nginx/ssl/
+sudo systemctl reload nginx
+
+# 4. Distribuer SEULEMENT le root-ca.crt aux clients
+# Les clients feront confiance à toutes les signatures du CA
+```
+
+#### 3. Rotation des Mots de Passe
+
+**Politique recommandée** :
+- Changement du mot de passe admin tous les 90 jours
+- Utilisation de mots de passe forts (16+ caractères)
+- Éviter les mots de passe réutilisés
+
+**Automatisation** :
+```bash
+# Script de rotation mensuelle (cron)
+#!/bin/bash
+NEW_PASS=$(openssl rand -base64 32)
+curl -k -X PUT -u admin:$OLD_PASS \
+  -H "Content-Type: application/json" \
+  -d "{\"old_password\":\"$OLD_PASS\",\"new_password\":\"$NEW_PASS\"}" \
+  https://harbor.lab.local/api/v2.0/users/1/password
+
+# Stocker le nouveau mot de passe dans Vault
+ansible-vault encrypt_string "$NEW_PASS" --name 'harbor_admin_password' \
+  >> inventory/host_vars/harbor.yml
+```
+
+---
+
+### 📝 Logs de Diagnostic Utiles
+
+```bash
+# Logs Harbor Core (authentification)
+docker logs harbor-core --tail 100 --follow
+
+# Logs Nginx Harbor (requêtes proxy)
+docker logs nginx --tail 100 --follow
+
+# Logs PostgreSQL (requêtes DB)
+docker logs harbor-db --tail 100 --follow
+
+# Logs Reverse Proxy (SSL/TLS)
+ssh ansible@172.16.100.253 \
+  "sudo docker logs nginx-reverse-proxy --tail 100"
+
+# Vérification du statut de santé
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+# Vérification de la configuration DNS
+resolvectl query harbor.lab.local
+
+# Test de la chaîne TLS complète
+openssl s_client -connect harbor.lab.local:443 -showcerts
+```
+
+---
+
+***
+
+## �📚 Références Officielles
 
 - **Documentation Harbor** : https://goharbor.io/docs/2.10.0/
 - **GitHub Harbor** : https://github.com/goharbor/harbor

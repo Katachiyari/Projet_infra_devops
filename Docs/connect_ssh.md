@@ -8,4 +8,4 @@ alertmanager.lab.local → 172.16.100.60:9093
 portainer.lab.local → 172.16.100.50:9000
 
 Exemple :
-ssh -N -L 8006:127.0.0.1:8006 -J james@10.8.0.30 root@10.250.250.4 
+ssh -N -L 8443:172.16.100.40:443 -J james@10.8.0.30 root@10.250.250.4

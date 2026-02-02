@@ -30,8 +30,6 @@ check_interval = 0
   # URL GitLab (SSOT) : correspond au point d'entrée reverse-proxy.
   url = "{{ gitlab_scheme }}://{{ gitlab_fqdn }}"
 
-  # Token d'enregistrement (provenant d'Ansible Vault).
-  token = "{{ gitlab_runner_token }}"
 
   # Type d'exécuteur (ex: docker, shell, etc.).
   executor = "{{ gitlab_runner_executor }}"

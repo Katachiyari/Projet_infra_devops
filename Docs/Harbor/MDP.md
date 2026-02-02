@@ -1,5 +1,5 @@
 réinitialisation du compte admin Harbor
-
+hP2mGVrskk3kcYmZWux59mqnuwLKWxma
 ---
 
 # 🔐 Récupération du compte administrateur Harbor (Docker)

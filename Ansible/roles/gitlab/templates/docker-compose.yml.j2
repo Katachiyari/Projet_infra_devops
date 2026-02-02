@@ -72,20 +72,19 @@ services:
         # Sécurité :
         # Mot de passe root initial (provenant d'Ansible Vault).
         # ---------------------------------------------------------------------
-        gitlab_rails['initial_root_password'] = '{{ gitlab_root_password }}'
 
         # ---------------------------------------------------------------------
         # SSH Git :
         # Permet à GitLab d'afficher le bon port dans "Clone SSH".
         # ---------------------------------------------------------------------
-        gitlab_rails['gitlab_shell_ssh_port'] = {{ gitlab_ssh_port }}
+        gitlab_rails['gitlab_shell_ssh_port'] = {{ gitlab_ssh_host_port }}
 
         # ---------------------------------------------------------------------
         # Tuning (performances) basiques :
         # Ajustables selon RAM/CPU de la VM.
         # ---------------------------------------------------------------------
         postgresql['shared_buffers'] = "256MB"
-        redis['maxmemory'] = '{{ gitlab_redis_maxmemory }}'
+        redis['maxmemory'] = '{{ gitlab_redis_maxmemory | default("256mb") }}'
 
         # ---------------------------------------------------------------------
         # Observabilité :
@@ -103,11 +102,11 @@ services:
       # -----------------------------------------------------------------------
 
       # Workhorse HTTP (backend reverse-proxy) :
-      # Le reverse-proxy Nginx pointe vers http://{{ gitlab_ip }}:{{ gitlab_workhorse_port }}.
+      # Le reverse-proxy Nginx pointe vers http://git-lab.lab.local:{{ gitlab_workhorse_port }}.
       - "{{ gitlab_workhorse_port | default(8181) }}:{{ gitlab_workhorse_port | default(8181) }}"
 
       # SSH Git (hôte -> conteneur 22).
-      - "{{ gitlab_ssh_port }}:22"
+      - "{{ gitlab_ssh_host_port }}:22"
 
       # Container Registry (hôte -> conteneur 5050).
       - "{{ gitlab_registry_port }}:5050"
@@ -161,6 +160,10 @@ services:
 
       # Accès au démon Docker hôte (puissant).
       - /var/run/docker.sock:/var/run/docker.sock
+
+      #30.01.2026 CA interne Lab Root CA
+      #Nécéssaire pour permettre a GitLab Runner de cérifier le certificat TLS de GitLab derriere le reverse proxy
+      - "{{ gitlab_runner_config_dir }}/certs:/etc/gitlab-runner/certs:ro"
 
       # Cache CI.
       - "{{ gitlab_runner_cache_dir }}:/cache"

@@ -2,8 +2,8 @@
 - name: Déployer GitLab CE (172.16.100.40)
   hosts: gitlab_hosts
   become: true
-  vars_files:
-    - ../secrets/gitlab.yml  # Vault secrets
+  #vars_files:
+   #- ../secrets/gitlab.yml  # Vault secrets
   roles:
     - role: node_exporter    # Monitoring (préexistant)
     - role: gitlab           # Nouveau rôle

@@ -20,11 +20,11 @@
       - gitlab_fqdn is defined
       - gitlab_scheme is defined
       - gitlab_healthcheck_path is defined
-  fail_msg: >
-    Les variables SSOT suivantes doivent être définies :
-    - gitlab_fqdn
-    - gitlab_scheme
-    - gitlab_healthcheck_path
+    fail_msg: >
+      Les variables SSOT suivantes doivent être définies :
+      - gitlab_fqdn
+      - gitlab_scheme
+      - gitlab_healthcheck_path
 
   become: true
 

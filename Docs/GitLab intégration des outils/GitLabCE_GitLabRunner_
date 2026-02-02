@@ -1,0 +1,350 @@
+---
+
+🚀 GitLab CE & GitLab Runner
+
+🛠️ Dépannage, fiabilisation & alignement SSOT / TLS
+
+📅 Date : 02/02/2026
+🏷️ Tags : #GitLab #GitLabRunner #Ansible #Docker #ReverseProxy #TLS #PKI #DevSecOps #SSOT
+📁 Contexte : Plateforme DevOps interne – déploiement automatisé via Ansible
+
+
+---
+
+🎯 1. Objectif de l’intervention
+
+Cette intervention avait pour but de stabiliser et fiabiliser le déploiement de GitLab CE + GitLab Runner, en assurant :
+
+🔐 une chaîne TLS de confiance (PKI interne)
+
+🧩 une SSOT claire et cohérente
+
+🔁 une idempotence réelle du rôle Ansible
+
+🧹 la suppression des dépendances obsolètes (Vault)
+
+🛡️ une approche DevSecOps (pas de secrets en clair)
+
+
+
+---
+
+🧱 2. Architecture cible (rappel)
+
+🌐 Réseau & accès
+
+GitLab CE
+
+VM : git-lab
+
+IP : 172.16.100.40
+
+❌ Jamais exposé directement
+
+
+Reverse-proxy Nginx
+
+IP : 172.16.100.253
+
+FQDN : git-lab.lab.local
+
+
+DNS interne (Bind9)
+
+git-lab.lab.local → 172.16.100.253
+
+
+
+🔐 Sécurité
+
+PKI interne
+
+Lab Root CA
+
+
+TLS
+
+Certificat wildcard *.lab.local
+
+Validation complète côté Runner
+
+
+
+👉 Principe clé : aucune IP hardcodée, tout passe par DNS + FQDN
+
+
+---
+
+⚠️ 3. Problèmes rencontrés
+
+🧩 3.1 Variables Ansible manquantes
+
+Plusieurs variables bloquaient la convergence :
+
+gitlab_root_password
+
+gitlab_ip
+
+gitlab_ssh_port
+
+gitlab_redis_maxmemory
+
+gitlab_runner_token
+
+
+➡️ Variables historiques, non alignées avec la SSOT actuelle.
+
+
+---
+
+🔐 3.2 Dépendance Vault fantôme
+
+Le rôle faisait référence à :
+
+../secrets/gitlab.yml
+
+des secrets absents du dépôt
+
+
+➡️ Le playbook devenait non portable et impossible à rejouer ailleurs.
+
+
+---
+
+⏳ 3.3 Blocage sur l’attente HTTPS
+
+La task Ansible :
+
+> Attendre ouverture du port HTTPS GitLab
+
+
+
+restait bloquée alors que :
+
+le service répondait déjà
+
+le reverse-proxy était fonctionnel
+
+
+➡️ Faux blocage lié au wait_for.
+
+
+---
+
+🐳 3.4 Conflit Docker (gitlab-runner)
+
+Après modification du docker-compose.yml :
+
+le conteneur gitlab-runner existait déjà
+
+Docker refusait la recréation (nom identique)
+
+
+➡️ Intervention manuelle unique nécessaire.
+
+
+---
+
+🛠️ 4. Actions correctives appliquées
+
+🧹 4.1 Nettoyage SSOT
+
+❌ Suppression complète de Vault
+
+✅ Utilisation exclusive des variables SSOT :
+
+gitlab_fqdn
+
+gitlab_scheme
+
+gitlab_workhorse_port
+
+
+➕ Ajout de default() pour les paramètres non critiques (ex: Redis)
+
+
+📌 Résultat : rôle portable, relançable, prédictible
+
+
+---
+
+🌐 4.2 Suppression de gitlab_ip
+
+Variable anti-pattern
+
+Incohérente avec DNS / reverse-proxy
+
+
+➡️ Remplacée par :
+
+FQDN
+
+résolution réseau Docker
+
+
+
+---
+
+🏃 4.3 GitLab Runner – gestion du token
+
+❌ Suppression de gitlab_runner_token
+
+❌ Plus d’enregistrement automatique
+
+
+✅ Bonne pratique DevSecOps :
+
+token court-vécu
+
+jamais stocké dans Git
+
+enregistrement manuel depuis l’UI GitLab
+
+
+
+---
+
+🔐 4.4 Confiance TLS du Runner
+
+Ajout d’un bind mount CA :
+
+/srv/gitlab/runner/certs → /etc/gitlab-runner/certs (ro)
+
+🎯 Effet :
+
+le runner fait confiance à GitLab
+
+plus d’erreurs TLS dans les jobs CI
+
+
+
+---
+
+🐳 4.5 Conflit Docker (résolu proprement)
+
+Action contrôlée, une seule fois :
+
+docker rm -f gitlab-runner
+
+Puis relance du playbook → convergence OK.
+
+
+---
+
+✅ 5. Validations finales
+
+🐳 Services Docker
+
+gitlab → healthy
+
+gitlab-runner → healthy
+
+
+🔐 TLS
+
+curl -I https://git-lab.lab.local
+# HTTP/2 302
+
+🌐 Réseau
+
+nc -vz git-lab.lab.local 443
+# succeeded
+
+📦 Runner
+
+CA visible dans /etc/gitlab-runner/certs
+
+Bind mount confirmé
+
+
+
+---
+
+🧾 6. Git – traçabilité & rollback
+
+📝 Commit
+
+gitlab: fix role vars, remove vault dependency, mount CA into runner
+
+🏷️ Tag
+
+gitlab-runner-ca-20260202-1840
+
+➡️ Rollback immédiat possible
+
+
+---
+
+🟢 7. État final
+
+✅ GitLab CE opérationnel
+✅ GitLab Runner fonctionnel
+✅ TLS validé (PKI interne)
+✅ Rôle Ansible idempotent
+✅ Zéro secret en clair
+✅ Conforme DevSecOps / SSOT
+
+
+---
+
+🔜 8. Prochaines étapes
+
+🧩 Enregistrement manuel du runner dans GitLab
+
+🧪 Mise en place des pipelines CI (lint, test, security, build)
+
+📊 Supervision Runner (Prometheus)
+
+📘 Documentation dédiée “Enregistrement GitLab Runner – bonnes pratiques”
+
+
+
+---
+┌───────────────────────────┐
+                        │        Utilisateurs        │
+                        │   (Navigateur / Git CLI)   │
+                        └─────────────┬─────────────┘
+                                      │ HTTPS 443
+                                      ▼
+                    ┌──────────────────────────────────┐
+                    │      Reverse-Proxy Nginx          │
+                    │   IP : 172.16.100.253             │
+                    │   FQDN : git-lab.lab.local        │
+                    │   Cert TLS : *.lab.local          │
+                    └─────────────┬────────────────────┘
+                                  │ HTTP interne
+                                  │ (Docker network)
+                                  ▼
+        ┌─────────────────────────────────────────────────────┐
+        │                   VM GitLab                          │
+        │            Host : git-lab (172.16.100.40)             │
+        │                                                     │
+        │  ┌──────────────────────────────────────────────┐ │
+        │  │              GitLab CE (Docker)               │ │
+        │  │  - Omnibus GitLab                              │ │
+        │  │  - Workhorse : 8181                            │ │
+        │  │  - Registry interne : 5050                     │ │
+        │  │                                                │ │
+        │  │  Volumes (SSOT) :                              │ │
+        │  │   /srv/gitlab/config                           │ │
+        │  │   /srv/gitlab/data                             │ │
+        │  │   /srv/gitlab/logs                             │ │
+        │  └──────────────────────────────────────────────┘ │
+        │                                                     │
+        │  ┌──────────────────────────────────────────────┐ │
+        │  │          GitLab Runner (Docker)               │ │
+        │  │  - Docker executor                            │ │
+        │  │  - Jobs CI/CD                                 │ │
+        │  │                                                │ │
+        │  │  Volumes :                                    │ │
+        │  │   /srv/gitlab/runner/config                   │ │
+        │  │   /srv/gitlab/runner/cache                    │ │
+        │  │   /srv/gitlab/runner/certs  (RO)              │ │
+        │  │     → /etc/gitlab-runner/certs                │ │
+        │  │     (Lab Root CA)                              │ │
+        │  └──────────────────────────────────────────────┘ │
+        │                                                     │
+        └─────────────────────────────────────────────────────┘
+
+DNS (Bind9)
+└── git-lab.lab.local → 172.16.100.253

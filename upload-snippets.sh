@@ -4,12 +4,32 @@
 set -euo pipefail
 
 # Variables de configuration
-PROXMOX_HOST="${PROXMOX_HOST:-10.250.250.4}"
-PROXMOX_NODE="${PROXMOX_NODE:-pve4}"
-PROXMOX_STORAGE="${PROXMOX_STORAGE:-jdk_snippets}"
+TFVARS_FILE="${TFVARS_FILE:-terraform.tfvars}"
 
-# Récupérer le token depuis terraform.tfvars
-PROXMOX_TOKEN=$(grep 'proxmox_api_token' terraform.tfvars | cut -d'"' -f2)
+read_tfvar() {
+    local key="$1"
+    local line
+    line="$(grep -E "^${key}[[:space:]]*=" "$TFVARS_FILE" | head -n1 || true)"
+    if [[ -z "$line" ]]; then
+        return 1
+    fi
+    sed -E 's/^[^"]*"([^"]+)".*$/\1/' <<<"$line"
+}
+
+if [[ ! -f "$TFVARS_FILE" ]]; then
+    echo "❌ Fichier introuvable: $TFVARS_FILE"
+    exit 1
+fi
+
+PROXMOX_HOST="${PROXMOX_HOST:-$(read_tfvar proxmox_endpoint | sed -E 's#https?://([^/:]+).*#\1#')}"
+PROXMOX_NODE="${PROXMOX_NODE:-$(read_tfvar node_name || true)}"
+PROXMOX_STORAGE="${PROXMOX_STORAGE:-$(read_tfvar datastore_snippets || true)}"
+PROXMOX_TOKEN="${PROXMOX_TOKEN:-$(read_tfvar proxmox_api_token || true)}"
+
+if [[ -z "${PROXMOX_HOST}" || -z "${PROXMOX_NODE}" || -z "${PROXMOX_STORAGE}" || -z "${PROXMOX_TOKEN}" ]]; then
+    echo "❌ Variables manquantes. Renseigne terraform.tfvars ou exporte PROXMOX_HOST, PROXMOX_NODE, PROXMOX_STORAGE, PROXMOX_TOKEN."
+    exit 1
+fi
 
 echo "📤 Upload des snippets cloud-init via l'API Proxmox..."
 

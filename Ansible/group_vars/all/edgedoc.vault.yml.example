@@ -1,0 +1,5 @@
+---
+# Copy to Ansible/group_vars/all/edgedoc.vault.yml then encrypt with ansible-vault.
+vault_edgedoc_db_password: "CHANGE_ME_EDGEDOC_DB_PASSWORD"
+vault_edgedoc_db_root_password: "CHANGE_ME_EDGEDOC_DB_ROOT_PASSWORD"
+vault_edgedoc_session_secret: "CHANGE_ME_EDGEDOC_SESSION_SECRET"

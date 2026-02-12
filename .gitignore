@@ -2,6 +2,7 @@
 .terraform/
 *.tfstate
 *.tfstate.*
+tfplan
 crash.log
 crash.*.log
 
@@ -12,11 +13,21 @@ terraform.tfvars
 
 # Backups / editor
 *.bak
+*.bak.*
 *.BACKUP.*
+*.lost.*
 *~
 
 # Ansible generated inventory
 Ansible/inventory/terraform.generated.yml
+
+# Local secrets and vault passwords
+Ansible/secrets/*.vault
+Ansible/secrets/*.yml
+Ansible/group_vars/all/vault.yml
+Ansible/group_vars/all/*.vault.yml
+Ansible/inventory/group_vars/*.vault.yml
+vault_pass.txt
 
 # Ansible facts/cache
 *.retry

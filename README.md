@@ -133,6 +133,10 @@ Même logique pour Portainer, GitLab, Taiga, EdgeDoc…
 3. `terraform plan -input=false`
 4. `terraform apply -input=false`
 5. Dans `Ansible/` :
+   - Copier et chiffrer les secrets depuis les fichiers `.example` :
+     - `secrets/gitlab.yml.example` → `secrets/gitlab.yml`
+     - `secrets/monitoring.vault.example` → `secrets/monitoring.vault`
+     - `group_vars/all/vault.yml.example` → `group_vars/all/vault.yml`
    - `./bootstrap.sh`
    - `./run-ping-test.sh` (ou `--bastion`)
    - Playbooks applicatifs (PKI, reverse-proxy, Harbor/Portainer, monitoring…)
@@ -203,5 +207,4 @@ roles/<app>/
 Ce README est la vitrine et la boussole du projet : tout y est pour comprendre, déployer, valider, et faire évoluer la stack DevSecOps.
 
 ---
-
 

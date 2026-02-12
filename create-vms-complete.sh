@@ -1,9 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROXMOX_HOST="10.250.250.4"
-PROXMOX_NODE="pve4"
-PROXMOX_TOKEN=$(grep 'proxmox_api_token' terraform.tfvars | cut -d'"' -f2)
+TFVARS_FILE="${TFVARS_FILE:-terraform.tfvars}"
+
+read_tfvar() {
+  local key="$1"
+  local line
+  line="$(grep -E "^${key}[[:space:]]*=" "$TFVARS_FILE" | head -n1 || true)"
+  if [[ -z "$line" ]]; then
+    return 1
+  fi
+  sed -E 's/^[^"]*"([^"]+)".*$/\1/' <<<"$line"
+}
+
+if [[ ! -f "$TFVARS_FILE" ]]; then
+  echo "❌ Fichier introuvable: $TFVARS_FILE"
+  exit 1
+fi
+
+PROXMOX_HOST="${PROXMOX_HOST:-$(read_tfvar proxmox_endpoint | sed -E 's#https?://([^/:]+).*#\1#')}"
+PROXMOX_NODE="${PROXMOX_NODE:-$(read_tfvar node_name || true)}"
+PROXMOX_TOKEN="${PROXMOX_TOKEN:-$(read_tfvar proxmox_api_token || true)}"
+
+if [[ -z "${PROXMOX_HOST}" || -z "${PROXMOX_NODE}" || -z "${PROXMOX_TOKEN}" ]]; then
+  echo "❌ Variables manquantes. Renseigne terraform.tfvars ou exporte PROXMOX_HOST, PROXMOX_NODE, PROXMOX_TOKEN."
+  exit 1
+fi
 
 echo "🚀 Création des VMs avec configuration complète..."
 
@@ -23,8 +45,7 @@ curl -k -X PUT -s "https://${PROXMOX_HOST}:8006/api2/json/nodes/${PROXMOX_NODE}/
   -d "cores=2&memory=1024&onboot=1&tags=bind9;dns;prod" \
   -d "ipconfig0=ip=172.16.100.254/24,gw=172.16.100.1" \
   -d "cicustom=user=jdk_snippets:snippets/user-data-bind9dns.yaml" \
-  -d "ciuser=ansible" \
-  -d "sshkeys=ssh-ed25519%20AAAAC3NzaC1lZDI1NTE5AAAAIE30vg7EchnxPkkVvAnbi0Ey55NGWRiUNE1ClsUvCj7d%20vm-common-key" > /dev/null
+  -d "ciuser=ansible" > /dev/null
 
 echo "▶️  Démarrage bind9dns..."
 curl -k -X POST -s "https://${PROXMOX_HOST}:8006/api2/json/nodes/${PROXMOX_NODE}/qemu/128/status/start" \
@@ -46,8 +67,7 @@ curl -k -X PUT -s "https://${PROXMOX_HOST}:8006/api2/json/nodes/${PROXMOX_NODE}/
   -d "cores=2&memory=4096&onboot=1&tags=ansible;dev;tools" \
   -d "ipconfig0=ip=172.16.100.20/24,gw=172.16.100.1" \
   -d "cicustom=user=jdk_snippets:snippets/user-data-tools-manager.yaml" \
-  -d "ciuser=ansible" \
-  -d "sshkeys=ssh-ed25519%20AAAAC3NzaC1lZDI1NTE5AAAAIE30vg7EchnxPkkVvAnbi0Ey55NGWRiUNE1ClsUvCj7d%20vm-common-key" > /dev/null
+  -d "ciuser=ansible" > /dev/null
 
 echo "▶️  Démarrage tools-manager..."
 curl -k -X POST -s "https://${PROXMOX_HOST}:8006/api2/json/nodes/${PROXMOX_NODE}/qemu/132/status/start" \

@@ -1,0 +1,3 @@
+---
+# Copy to Ansible/group_vars/all/vault.yml then encrypt with ansible-vault.
+vault_harbor_admin_password: "CHANGE_ME_HARBOR_ADMIN_PASSWORD"

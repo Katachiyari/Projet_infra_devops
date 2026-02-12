@@ -1,10 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROXMOX_HOST="10.250.250.4"
-PROXMOX_NODE="pve4"
-PROXMOX_TOKEN=$(grep 'proxmox_api_token' terraform.tfvars | cut -d'"' -f2)
-SSH_KEY_ENCODED="ssh-ed25519%20AAAAC3NzaC1lZDI1NTE5AAAAIE30vg7EchnxPkkVvAnbi0Ey55NGWRiUNE1ClsUvCj7d%20vm-common-key"
+TFVARS_FILE="${TFVARS_FILE:-terraform.tfvars}"
+
+read_tfvar() {
+    local key="$1"
+    local line
+    line="$(grep -E "^${key}[[:space:]]*=" "$TFVARS_FILE" | head -n1 || true)"
+    if [[ -z "$line" ]]; then
+        return 1
+    fi
+    sed -E 's/^[^"]*"([^"]+)".*$/\1/' <<<"$line"
+}
+
+if [[ ! -f "$TFVARS_FILE" ]]; then
+    echo "❌ Fichier introuvable: $TFVARS_FILE"
+    exit 1
+fi
+
+PROXMOX_HOST="${PROXMOX_HOST:-$(read_tfvar proxmox_endpoint | sed -E 's#https?://([^/:]+).*#\1#')}"
+PROXMOX_NODE="${PROXMOX_NODE:-$(read_tfvar node_name || true)}"
+PROXMOX_TOKEN="${PROXMOX_TOKEN:-$(read_tfvar proxmox_api_token || true)}"
+
+if [[ -z "${PROXMOX_HOST}" || -z "${PROXMOX_NODE}" || -z "${PROXMOX_TOKEN}" ]]; then
+    echo "❌ Variables manquantes. Renseigne terraform.tfvars ou exporte PROXMOX_HOST, PROXMOX_NODE, PROXMOX_TOKEN."
+    exit 1
+fi
 
 echo "🚀 Création de toutes les VMs avec cloud-init corrigé..."
 echo ""
@@ -39,8 +60,7 @@ create_vm() {
         -d "tags=${tags}" \
         -d "ipconfig0=ip=${ip}/24,gw=172.16.100.1" \
         -d "cicustom=user=jdk_snippets:snippets/user-data-${name}.yaml" \
-        -d "ciuser=ansible" \
-        -d "sshkeys=${SSH_KEY_ENCODED}" > /dev/null
+        -d "ciuser=ansible" > /dev/null
     
     # Redimensionnement du disque si nécessaire
     if [ "${disk}" != "20" ]; then

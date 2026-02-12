@@ -6,11 +6,36 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Charger les valeurs manuellement
-ENDPOINT="https://10.250.250.4:8006"
-TOKEN="terraform-jdk@pve4!jdk-token=c4a17231-fab8-4cd6-801e-bc0dd0251b1c"
-DATASTORE="jdk_snippets"
-SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE30vg7EchnxPkkVvAnbi0Ey55NGWRiUNE1ClsUvCj7d vm-common-key"
+TFVARS_FILE="${TFVARS_FILE:-terraform.tfvars}"
+
+read_tfvar() {
+  local key="$1"
+  local line
+  line="$(grep -E "^${key}[[:space:]]*=" "$TFVARS_FILE" | head -n1 || true)"
+  if [[ -z "$line" ]]; then
+    return 1
+  fi
+  sed -E 's/^[^"]*"([^"]+)".*$/\1/' <<<"$line"
+}
+
+if [[ ! -f "$TFVARS_FILE" ]]; then
+  echo "❌ Fichier introuvable: $TFVARS_FILE"
+  exit 1
+fi
+
+ENDPOINT="${PROXMOX_ENDPOINT:-$(read_tfvar proxmox_endpoint || true)}"
+TOKEN="${PROXMOX_TOKEN:-$(read_tfvar proxmox_api_token || true)}"
+DATASTORE="${PROXMOX_STORAGE:-$(read_tfvar datastore_snippets || true)}"
+SSH_KEY="${SSH_PUBLIC_KEY:-$(read_tfvar ssh_public_key || true)}"
+PROXMOX_NODE="${PROXMOX_NODE:-$(read_tfvar node_name || true)}"
+
+ENDPOINT="${ENDPOINT%/}"
+
+if [[ -z "${ENDPOINT}" || -z "${TOKEN}" || -z "${DATASTORE}" || -z "${SSH_KEY}" || -z "${PROXMOX_NODE}" ]]; then
+  echo "❌ Variables manquantes. Renseigne terraform.tfvars ou exporte:"
+  echo "   PROXMOX_ENDPOINT, PROXMOX_TOKEN, PROXMOX_STORAGE, SSH_PUBLIC_KEY, PROXMOX_NODE"
+  exit 1
+fi
 
 echo "========================================="
 echo "Upload snippets cloud-init"
@@ -84,7 +109,7 @@ for file in "$SNIPPETS_DIR"/user-data-*.yaml; do
   response=$(curl -k -s -X POST \
     -H "Authorization: PVEAPIToken=$TOKEN" \
     -F "filename=@$file" \
-    "$ENDPOINT/api2/json/nodes/pve4/storage/$DATASTORE/upload" 2>&1)
+    "$ENDPOINT/api2/json/nodes/$PROXMOX_NODE/storage/$DATASTORE/upload" 2>&1)
   
   if echo "$response" | grep -q '"status":"ok"'; then
     echo "  ✓ $filename"

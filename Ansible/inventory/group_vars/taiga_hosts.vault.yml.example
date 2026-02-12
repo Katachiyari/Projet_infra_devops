@@ -1,0 +1,5 @@
+---
+# Copy to Ansible/inventory/group_vars/taiga_hosts.vault.yml then encrypt with ansible-vault.
+vault_taiga_postgres_password: "CHANGE_ME_TAIGA_POSTGRES_PASSWORD"
+vault_taiga_secret_key: "CHANGE_ME_TAIGA_SECRET_KEY"
+vault_taiga_rabbitmq_erlang_cookie: "CHANGE_ME_TAIGA_ERLANG_COOKIE"

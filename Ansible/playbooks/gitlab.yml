@@ -2,8 +2,11 @@
 - name: Déployer GitLab CE (172.16.100.40)
   hosts: gitlab_hosts
   become: true
-  #vars_files:
-   #- ../secrets/gitlab.yml  # Vault secrets
+  pre_tasks:
+    - name: Charger secrets GitLab (Vault)
+      ansible.builtin.include_vars:
+        file: ../secrets/gitlab.yml
+      no_log: true
   roles:
     - role: node_exporter    # Monitoring (préexistant)
     - role: gitlab           # Nouveau rôle

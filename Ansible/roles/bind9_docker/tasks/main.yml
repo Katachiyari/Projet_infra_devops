@@ -94,11 +94,31 @@
     state: started
     restart_policy: always
     network_mode: host
+    # Force explicit startup command to avoid image entrypoint forcing "-u bind"
+    # which conflicts with host volume permissions in this lab.
+    entrypoint:
+      - /usr/sbin/named
+    command:
+      - -f
+      - -c
+      - /etc/bind/named.conf
     user: "{{ bind9_docker_user | default(omit) }}"
     volumes:
       - "{{ bind9_docker_config_dir }}:/etc/bind:rw"
       - "{{ bind9_docker_cache_dir }}:/var/cache/bind:rw"
       - "{{ bind9_docker_log_dir }}:/var/log/bind:rw"
+
+- name: Wait until Bind9 container is running (not restarting)
+  community.docker.docker_container_info:
+    name: "{{ bind9_docker_container_name }}"
+  register: bind9_container_info
+  retries: 15
+  delay: 2
+  until:
+    - bind9_container_info.container is defined
+    - bind9_container_info.container.State is defined
+    - bind9_container_info.container.State.Running | default(false)
+    - not (bind9_container_info.container.State.Restarting | default(false))
 
 
 - name: Healthcheck - named-checkconf inside container
@@ -117,4 +137,4 @@
   register: bind9_dig_healthcheck
   changed_when: false
   delegate_to: localhost
-
+  become: false

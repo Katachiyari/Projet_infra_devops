@@ -1,7 +1,12 @@
 ---
 - name: Déployer Taiga (Docker Compose)
-  hosts: taiga_hosts
+  hosts: tools_hosts
   become: true
   gather_facts: true
   roles:
-    - taiga
+    - role: taiga
+      vars:
+        taiga_scheme: "https"
+        taiga_domain: "taiga.lab.local"
+        taiga_websockets_scheme: "wss"
+        taiga_subpath: ""

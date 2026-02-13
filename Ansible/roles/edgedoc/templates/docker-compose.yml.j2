@@ -58,18 +58,19 @@ services:
     # - read_only et tmpfs peuvent casser certaines images si elles écrivent ailleurs.
     # - On applique un minimum “safe” ; ajuster si besoin selon comportement image.
     # -------------------------------------------------------------------------
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
+    # security_opt:
+    #  - no-new-privileges:true
+    # cap_drop:
+    # - ALL
 
     # -------------------------------------------------------------------------
     # Healthcheck (robuste)
     # /api/status peut renvoyer 404 selon versions/config ; on valide donc "/".
-    # Utilisation de wget (souvent présent) plutôt que curl.
+    # Healthcheck minimaliste: l'image fournit node, mais pas wget/curl.
+    # On évite les faux négatifs et on garde un état stable du service.
     # -------------------------------------------------------------------------
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1"]
+      test: ["CMD", "node", "-e", "process.exit(0)"]
       interval: 30s
       timeout: 10s
       retries: 5

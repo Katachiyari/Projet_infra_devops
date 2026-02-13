@@ -29,7 +29,11 @@ check_interval = 0
 
   # URL GitLab (SSOT) : correspond au point d'entrée reverse-proxy.
   url = "{{ gitlab_scheme }}://{{ gitlab_fqdn }}"
+  tls-ca-file = "/etc/gitlab-runner/certs/{{ gitlab_fqdn }}.crt"
 
+{% if gitlab_runner_token is defined and gitlab_runner_token | length > 0 %}
+  token = "{{ gitlab_runner_token }}"
+{% endif %}
 
   # Type d'exécuteur (ex: docker, shell, etc.).
   executor = "{{ gitlab_runner_executor }}"

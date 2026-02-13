@@ -6,9 +6,15 @@ bind9_forward_servers:
   - "1.1.1.1"
   - "9.9.9.9"
 
+# Exécution en root dans ce lab: évite les erreurs de droits sur les volumes host (/srv/bind9/*)
+bind9_docker_user: "root"
+bind9_docker_dir_mode: "0755"
+bind9_docker_file_mode: "0644"
+
 # Réseaux autorisés à résoudre via ce DNS
 bind9_our_networks:
   - "172.16.100.0/24"
+  - "10.20.71.0/24"
   - localhost
 
 # Zone interne 
@@ -25,7 +31,7 @@ bind9_zones_dynamic:
       - { label: "ubuntu-host", type: "A", rdata: "172.16.100.100" }
   - name: "lab.local"
     type: master
-    serial: 2026012011
+    serial: 2026021302
     admin: "postmaster.lab.local"
     ns_records:
       - "dns-server.lab.local"
@@ -35,6 +41,8 @@ bind9_zones_dynamic:
       - { label: "portainer", type: "A", rdata: "172.16.100.253" }
       - { label: "git-lab", type: "A", rdata: "172.16.100.40" }
       - { label: "gitlab", type: "CNAME", rdata: "git-lab.lab.local." }
+      - { label: "registry", type: "A", rdata: "172.16.100.253" }
+      - { label: "registry.gitlab", type: "A", rdata: "172.16.100.253" }
       - { label: "taiga", type: "A", rdata: "172.16.100.253" }
       - { label: "edgedoc", type: "A", rdata: "172.16.100.253" }
       - { label: "grafana", type: "A", rdata: "172.16.100.253" }

@@ -29,14 +29,14 @@ nginx_rp_backends:
     host: "172.16.100.50"
     port: 9000
   gitlab:
-    host: "172.16.100.30"
-    port: 80
+    host: "172.16.100.40"
+    port: 8181
   gitlab_registry:
-    host: "172.16.100.30"
+    host: "172.16.100.40"
     port: 5050
   taiga:
     host: "172.16.100.20"
-    port: 80
+    port: 9000
   edgedoc:
     host: "172.16.100.20"
     port: 8080

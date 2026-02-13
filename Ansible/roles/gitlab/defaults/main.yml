@@ -38,6 +38,8 @@ gitlab_data_dir: "/srv/gitlab/data"
 gitlab_runner_dir: "/srv/gitlab/runner"
 gitlab_runner_config_dir: "{{ gitlab_runner_dir }}"
 gitlab_runner_cache_dir: "{{ gitlab_runner_dir }}/cache"
+gitlab_runner_certs_dir: "{{ gitlab_runner_config_dir }}/certs"
+gitlab_runner_ca_src: "{{ playbook_dir }}/../../root-ca.crt"
 
 # =============================================================================
 # Intégrations infrastructure (non sensibles)
@@ -64,9 +66,10 @@ gitlab_runner_concurrent: 4
 # =============================================================================
 gitlab_hostname: "{{ gitlab_fqdn }}"
 gitlab_external_url: "{{ gitlab_scheme }}://{{ gitlab_fqdn }}"
-gitlab_registry_external_url: "https://registry.{{ gitlab_hostname }}"
+gitlab_registry_fqdn: "registry.lab.local"
+gitlab_registry_external_url: "https://{{ gitlab_registry_fqdn }}"
+gitlab_runner_gitlab_resolve_ip: "172.16.100.253"
+gitlab_runner_registry_resolve_ip: "172.16.100.253"
 
 gitlab_http_port: 80
 gitlab_registry_port: 5050
-
-

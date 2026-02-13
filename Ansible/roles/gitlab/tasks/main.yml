@@ -67,6 +67,62 @@
     - "{{ gitlab_runner_cache_dir }}"
   become: true
 
+- name: Créer le dossier des certificats Runner
+  ansible.builtin.file:
+    path: "{{ gitlab_runner_certs_dir }}"
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: Vérifier la présence de la CA locale sur le control node
+  ansible.builtin.stat:
+    path: "{{ gitlab_runner_ca_src }}"
+  register: gitlab_runner_ca_src_stat
+  delegate_to: localhost
+  become: false
+
+- name: Échouer si la CA locale est introuvable
+  ansible.builtin.assert:
+    that:
+      - gitlab_runner_ca_src_stat.stat.exists
+    fail_msg: >
+      Certificat CA introuvable: {{ gitlab_runner_ca_src }}.
+      Ajuster gitlab_runner_ca_src (ex: /media/james/DATA2/Projet_infra_devops/root-ca.crt).
+
+- name: Installer la CA locale pour GitLab et Registry dans le Runner
+  ansible.builtin.copy:
+    src: "{{ gitlab_runner_ca_src }}"
+    dest: "{{ gitlab_runner_certs_dir }}/{{ item }}.crt"
+    mode: '0644'
+  loop:
+    - "{{ gitlab_fqdn }}"
+    - "{{ gitlab_registry_fqdn }}"
+  notify: restart runner
+  become: true
+
+- name: Créer le trust store Docker pour le Registry GitLab
+  ansible.builtin.file:
+    path: "/etc/docker/certs.d/{{ gitlab_registry_fqdn }}"
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: Installer la CA locale pour le Docker daemon (registry GitLab)
+  ansible.builtin.copy:
+    src: "{{ gitlab_runner_ca_src }}"
+    dest: "/etc/docker/certs.d/{{ gitlab_registry_fqdn }}/ca.crt"
+    mode: '0644'
+  become: true
+
+- name: Assurer la résolution locale GitLab/Registry vers le reverse-proxy
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^\s*{{ gitlab_runner_gitlab_resolve_ip | regex_escape() }}\s+.*\b{{ gitlab_fqdn | regex_escape() }}\b'
+    line: "{{ gitlab_runner_gitlab_resolve_ip }} {{ gitlab_fqdn }} {{ gitlab_registry_fqdn }}"
+    state: present
+    create: true
+  become: true
+
 
 # -----------------------------------------------------------------------------
 # 4) Déploiement du docker-compose.yml.

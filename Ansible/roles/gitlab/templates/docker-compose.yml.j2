@@ -153,6 +153,10 @@ services:
     image: "gitlab/gitlab-runner:{{ gitlab_runner_version }}"
     container_name: gitlab-runner
     restart: unless-stopped
+    extra_hosts:
+      # Force la résolution des FQDN via le reverse-proxy (pas via la DNS Docker interne).
+      - "{{ gitlab_fqdn }}:{{ gitlab_runner_gitlab_resolve_ip }}"
+      - "{{ gitlab_registry_fqdn }}:{{ gitlab_runner_registry_resolve_ip }}"
 
     volumes:
       # Configuration persistante du Runner.

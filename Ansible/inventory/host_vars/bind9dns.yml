@@ -11,7 +11,7 @@ bind9_our_networks:
   - "172.16.100.0/24"
   - localhost
 
-# Zone interne (exemple dynamique)
+# Zone interne 
 bind9_authoritative: true
 bind9_zones_dynamic:
   - name: "jdk.lab"
@@ -40,3 +40,12 @@ bind9_zones_dynamic:
       - { label: "grafana", type: "A", rdata: "172.16.100.253" }
       - { label: "prometheus", type: "A", rdata: "172.16.100.253" }
       - { label: "alertmanager", type: "A", rdata: "172.16.100.253" }
+      - { label: "bind9dns", type: "A", rdata: "172.16.100.254" }
+      - { label: "reverse-proxy", type: "A", rdata: "172.16.100.253" }
+      - { label: "tools-manager", type: "A", rdata: "172.16.100.20" }
+      - { label: "harbor-vm", type: "A", rdata: "172.16.100.50" }
+      - { label: "git-lab-vm", type: "A", rdata: "172.16.100.40" }
+      - { label: "monitoring-stack", type: "A", rdata: "172.16.100.60" }
+      - { label: "k3s-manager", type: "A", rdata: "172.16.100.250" }
+      - { label: "k3s-worker-0", type: "A", rdata: "172.16.100.251" }
+      - { label: "k3s-worker-1", type: "A", rdata: "172.16.100.252" }

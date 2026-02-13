@@ -9,5 +9,7 @@ bastion_enabled: false
 bastion_host: "172.16.100.100"
 bastion_user: "admin1"
 
-# Si bastion_enabled=true, Ansible utilisera automatiquement ProxyJump pour joindre les hôtes privés.
-ansible_ssh_common_args: "{{ ('-o ProxyJump=%s@%s' | format(bastion_user, bastion_host)) if (bastion_enabled | bool) else '' }}"
+# Options SSH stables pour éviter les conflits avec ~/.ssh/config local.
+# Si besoin de bastion ponctuel, passe-le en CLI:
+#   -e 'ansible_ssh_common_args=-F /dev/null -o StrictHostKeyChecking=accept-new -o ProxyJump=admin1@172.16.100.100'
+ansible_ssh_common_args: "-F /dev/null -o StrictHostKeyChecking=accept-new"

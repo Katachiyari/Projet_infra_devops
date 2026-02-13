@@ -51,7 +51,10 @@ Internet/Client
 │ Harbor  | 172.16.100.50:80                                 │
 │ Portainer | 172.16.100.50:9000                             │
 │ Monitoring | 172.16.100.60:9090/3000/9093                  │
-│ (GitLab, Taiga, EdgeDoc à venir)                           │
+│ GitLab | 172.16.100.40:8181                                │
+│ GitLab Registry | 172.16.100.40:5050                       │
+│ Taiga | 172.16.100.20:8080                                 │
+│ EdgeDoc | 172.16.100.20:8080                               │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -73,7 +76,7 @@ Internet/Client
 ### 1️⃣ Nginx reverse-proxy (172.16.100.253)
 - Rôle : `Ansible/roles/nginx_reverse_proxy/`
 - Nginx Docker (`nginx:1.25-alpine`), TLS termination, redirection HTTP→HTTPS
-- Upstreams HTTP vers Harbor, Portainer, (GitLab, Taiga, EdgeDoc à venir)
+- Upstreams HTTP vers Harbor, Portainer, GitLab, Registry, Taiga, EdgeDoc
 - Headers sécurité (HSTS, X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy)
 - Rate-limiting, logs JSON, monitoring Prometheus, health endpoint
 
@@ -89,6 +92,16 @@ Internet/Client
 - Prometheus, Grafana, Alertmanager (Docker Compose)
 - Node Exporter sur chaque VM (systemd)
 - Dashboards, alertes, health-checks
+
+### 4️⃣ GitLab + Registry (172.16.100.40)
+- Rôle : `Ansible/roles/gitlab/`
+- GitLab via reverse-proxy (backend Workhorse `8181`)
+- Container Registry actif sur `5050`, exposé via `registry.gitlab.lab.local`
+
+### 5️⃣ Taiga + EdgeDoc (172.16.100.20)
+- Rôles : `Ansible/roles/taiga/`, `Ansible/roles/edgedoc/`
+- Backends HTTP validés sur `8080`
+- Exposition TLS via reverse-proxy (`taiga.lab.local`, `edgedoc.lab.local`)
 
 ---
 
@@ -113,6 +126,10 @@ Même logique pour Portainer, GitLab, Taiga, EdgeDoc…
 
 - 🔐 [https://harbor.lab.local/](https://harbor.lab.local/)
 - 🧭 [https://portainer.lab.local/](https://portainer.lab.local/)
+- 🦊 [https://git-lab.lab.local/](https://git-lab.lab.local/)
+- 📦 [https://registry.gitlab.lab.local/v2/](https://registry.gitlab.lab.local/v2/) *(401 attendu sans auth)*
+- 🗂️ [https://taiga.lab.local/](https://taiga.lab.local/)
+- 📝 [https://edgedoc.lab.local/](https://edgedoc.lab.local/)
 - 📈 [http://prometheus.lab.local:9090/](http://prometheus.lab.local:9090/)
 - 📊 [http://grafana.lab.local:3000/](http://grafana.lab.local:3000/)
 - 🚨 [http://alertmanager.lab.local:9093/](http://alertmanager.lab.local:9093/)
@@ -138,7 +155,8 @@ Même logique pour Portainer, GitLab, Taiga, EdgeDoc…
      - `secrets/monitoring.vault.example` → `secrets/monitoring.vault`
      - `group_vars/all/vault.yml.example` → `group_vars/all/vault.yml`
    - `./bootstrap.sh`
-   - `./run-ping-test.sh` (ou `--bastion`)
+   - Test direct depuis le poste local :
+     - `ansible -i inventory/hosts.yml all -m ping -u ansible --private-key "$HOME/.ssh/id_ed25519_admin1_nopass" --ask-vault-pass`
    - Playbooks applicatifs (PKI, reverse-proxy, Harbor/Portainer, monitoring…)
 
 ### 🧑‍💻 Structure des rôles Ansible (exemple)
@@ -172,28 +190,17 @@ roles/<app>/
 
 ---
 
-## 🔮 Roadmap (prochaines missions)
+## 🔮 Roadmap (suite)
 
-> Les prochaines étapes sont déjà spécifiées dans [ia.txt](ia.txt). La stack actuelle a été pensée pour les accueillir **sans refonte**.
+État validé au 13 février 2026 :
+- GitLab + Registry opérationnels derrière reverse-proxy
+- Taiga + EdgeDoc opérationnels derrière reverse-proxy
+- Ping Ansible OK depuis le poste local vers toutes les VMs
 
-### 🚧 Mission 3 – GitLab (à venir)
-- VM dédiée (GitLab) avec services HTTP :
-  - GitLab web : `172.16.100.40:80`
-  - Registry : `172.16.100.40:5050`
-- Reverse-proxy Nginx en frontal :
-  - `https://gitlab.lab.local/` → backend HTTP GitLab
-  - `https://registry.gitlab.lab.local/` → backend HTTP registry
-- Intégration GitLab Runner, CI/CD, registry Docker
-
-### 🚧 Mission 4 – Taiga + EdgeDoc (à venir)
-- VM applicative partagée (ou dédiée selon design final) :
-  - Taiga (gestion de projet agile) en HTTP (port 80)
-  - EdgeDoc (docs collaboratives) en HTTP (port 8080)
-- Exposition via reverse-proxy :
-  - `https://taiga.lab.local/`
-  - `https://edgedoc.lab.local/`
-
-**Pattern** : Toujours HTTP interne, HTTPS externe, PKI locale, UFW, Trivy, Ansible idempotent
+Prochaines améliorations recommandées :
+- normaliser la clé SSH d’inventaire (`inventory/hosts.yml`) avec la clé réellement utilisée en exploitation ;
+- compléter les secrets Vault avec des valeurs fortes (remplacer les `CHANGE_ME`) ;
+- ajouter des checks de validation HTTP post-playbook (codes attendus : `200/302/401` selon service).
 
 ---
 
@@ -207,4 +214,3 @@ roles/<app>/
 Ce README est la vitrine et la boussole du projet : tout y est pour comprendre, déployer, valider, et faire évoluer la stack DevSecOps.
 
 ---
-

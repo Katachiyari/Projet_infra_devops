@@ -21,7 +21,7 @@ En résumé :
 
 ## 2️⃣ Activation côté Terraform / Proxmox
 
-Dans [main.tf](../main.tf), le guest agent est activé pour toutes les VMs :
+Dans [main.tf](../../main.tf), le guest agent est activé pour toutes les VMs :
 
 ```hcl
 agent {
@@ -106,7 +106,7 @@ Ces erreurs apparaissent quand :
 
 La séquence correcte est donc :
 
-1. Activer `agent { enabled = true }` dans [main.tf](../main.tf).
+1. Activer `agent { enabled = true }` dans [main.tf](../../main.tf).
 2. Appliquer Terraform (`terraform apply`).
 3. Installer et démarrer `qemu-guest-agent` via Ansible.
 4. Re-lancer un `terraform apply` si nécessaire pour que le provider valide correctement l'état.

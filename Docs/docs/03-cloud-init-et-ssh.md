@@ -6,7 +6,7 @@ Ce chapitre explique comment les VMs reçoivent leur configuration initiale : r�
 
 ## 1️⃣ cloud-init côté Proxmox : le bloc `initialization`
 
-Dans ce projet, on utilise la fonctionnalité d'**initialisation Proxmox** (basée sur cloud-init) via Terraform, dans [main.tf](../main.tf) :
+Dans ce projet, on utilise la fonctionnalité d'**initialisation Proxmox** (basée sur cloud-init) via Terraform, dans [main.tf](../../main.tf) :
 
 ```hcl
 initialization {
@@ -50,10 +50,10 @@ La clé publique utilisée par cloud-init est fournie dans `terraform.tfvars` :
 ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDniJ+owGFsoKItC6RpAYsRypOmTsCK3LEtntb6gT/Ur admin1@management-jdk"
 ```
 
-Côté machine d'administration, la clé privée correspondante est généralement :
+Côté machine d'administration, la clé privée correspondante doit être la paire exacte de `ssh_public_key` (exemple courant dans ce lab) :
 
 ```bash
-~/.ssh/id_ed25519
+~/.ssh/id_ed25519_admin1_nopass
 ```
 
 C'est cette clé privée qui est utilisée :
@@ -61,14 +61,14 @@ C'est cette clé privée qui est utilisée :
 - Par **SSH** direct :
 
   ```bash
-  ssh -i ~/.ssh/id_ed25519 ansible@172.16.100.40
+  ssh -i ~/.ssh/id_ed25519_admin1_nopass ansible@172.16.100.40
   ```
 
 - Par **Ansible** :
 
   ```bash
-  ansible all -i Ansible/inventory/terraform.generated.yml \
-    -u ansible --private-key=~/.ssh/id_ed25519 -m ping
+  ansible all -i Ansible/inventory/hosts.yml \
+    -u ansible --private-key=~/.ssh/id_ed25519_admin1_nopass -m ping
   ```
 
 🔴 Si la clé publique dans `terraform.tfvars` **ne correspond pas** à la clé privée que tu utilises, tu obtiendras `Permission denied (publickey)`.
@@ -77,7 +77,7 @@ C'est cette clé privée qui est utilisée :
 
 ## 3️⃣ Modèle cloud-init détaillé (référence)
 
-Un fichier cloud-init plus avancé est disponible dans [cloud-init/user-data.yaml.tftpl](../cloud-init/user-data.yaml.tftpl). Il montre comment :
+Un fichier cloud-init plus avancé est disponible dans [cloud-init/user-data.yaml.tftpl](../../cloud-init/user-data.yaml.tftpl). Il montre comment :
 
 - Définir le `hostname`.
 - Créer un utilisateur `ansible` avec :
@@ -88,7 +88,7 @@ Un fichier cloud-init plus avancé est disponible dans [cloud-init/user-data.yam
 - Installer des paquets (ex. `qemu-guest-agent`, `python3`, `sudo`).
 - Durcir la configuration SSH (`PasswordAuthentication no`, `PermitRootLogin no`, etc.).
 
-Ce template sert aujourd'hui surtout de **document de référence**, car la configuration minimale suffisante est déjà transmise via le bloc `initialization` dans [main.tf](../main.tf).
+Ce template sert aujourd'hui surtout de **document de référence**, car la configuration minimale suffisante est déjà transmise via le bloc `initialization` dans [main.tf](../../main.tf).
 
 ---
 
@@ -107,7 +107,7 @@ Vérifier :
 2. La clé privée utilisée en local :
 
    ```bash
-   ssh-keygen -y -f ~/.ssh/id_ed25519
+   ssh-keygen -y -f ~/.ssh/id_ed25519_admin1_nopass
    ```
 
    Comparer le type + le bloc base64 avec la valeur de `ssh_public_key`.
@@ -132,11 +132,29 @@ ssh-keygen -R 172.16.100.40   # adapter l'IP
 ssh ansible@172.16.100.40     # accepter le nouveau host key
 ```
 
-Les scripts modernes du projet (ex. [Ansible/lib/ssh-preflight.sh](../Ansible/lib/ssh-preflight.sh)) savent aussi nettoyer `known_hosts` de façon automatique.
+Les scripts modernes du projet (ex. [Ansible/lib/ssh-preflight.sh](../../Ansible/lib/ssh-preflight.sh)) savent aussi nettoyer `known_hosts` de façon automatique.
 
 ---
 
-## 5️⃣ Vérifier que cloud-init a bien fait son travail
+## 5️⃣ Accès direct depuis le poste local (sans jump)
+
+Si le routage est correct et qu'OPNsense ne redirige pas le LAN vers un bastion, l'accès SSH/Ansible se fait en direct depuis le poste local :
+
+```bash
+ssh -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519_admin1_nopass ansible@172.16.100.254
+```
+
+Puis :
+
+```bash
+cd Ansible
+ansible -i inventory/hosts.yml all -m ping -u ansible \
+  --private-key ~/.ssh/id_ed25519_admin1_nopass --ask-vault-pass
+```
+
+---
+
+## 6️⃣ Vérifier que cloud-init a bien fait son travail
 
 Une fois la VM démarrée :
 
@@ -161,11 +179,11 @@ Une fois la VM démarrée :
    ip route
    ```
 
-Les valeurs doivent correspondre à ce qui est défini dans `nodes` (voir [variables.tf](../variables.tf) / `terraform.tfvars`).
+Les valeurs doivent correspondre à ce qui est défini dans `nodes` (voir [variables.tf](../../variables.tf) / `terraform.tfvars`).
 
 ---
 
-## 6️⃣ Enchaînement avec Ansible
+## 7️⃣ Enchaînement avec Ansible
 
 Une fois :
 

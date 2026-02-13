@@ -32,5 +32,5 @@ Bienvenue dans la documentation détaillée du projet **Terraform + Proxmox + cl
 ---
 
 Pour une vue d'ensemble rapide du projet, tu peux aussi consulter :
-- [README.md](../README.md) à la racine (vision globale)
-- [Ansible/README.md](../Ansible/README.md) pour la partie automatisation Ansible.
+- [README.md](../../README.md) à la racine (vision globale)
+- [Ansible/README.md](../../Ansible/README.md) pour la partie automatisation Ansible.

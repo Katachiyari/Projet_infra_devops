@@ -6,7 +6,7 @@ Ce chapitre explique comment est organisée la partie **Ansible** du projet et c
 
 ## 1️⃣ Organisation du répertoire Ansible
 
-Le répertoire principal est [Ansible/](../Ansible/README.md). Sa structure (simplifiée) :
+Le répertoire principal est [Ansible/](../../Ansible/README.md). Sa structure (simplifiée) :
 
 ```text
 Ansible/
@@ -19,7 +19,6 @@ Ansible/
 ├── run-taiga-apply.sh
 │
 ├── inventory/
-│   ├── terraform.generated.yml
 │   ├── hosts.yml
 │   ├── group_vars/
 │   └── host_vars/
@@ -33,27 +32,27 @@ Ansible/
 │   └── bind9-docker.yml
 └── roles/
     └── ...
-``
+```
 
 Les fichiers essentiels :
 
-- [Ansible/ansible.cfg](../Ansible/ansible.cfg)  
+- [Ansible/ansible.cfg](../../Ansible/ansible.cfg)  
   ➜ Fichier de configuration central (inventaires, `remote_user`, options SSH, logs, etc.).
 
-- [Ansible/inventory/terraform.generated.yml](../Ansible/inventory/terraform.generated.yml)  
-  ➜ Inventaire généré par Terraform, listant les hôtes et leurs IPs.
+- [Ansible/inventory/hosts.yml](../../Ansible/inventory/hosts.yml)  
+  ➜ Inventaire d'exploitation du lab (hôtes, IPs, groupes).
 
-- [Ansible/lib/ssh-preflight.sh](../Ansible/lib/ssh-preflight.sh)  
+- [Ansible/lib/ssh-preflight.sh](../../Ansible/lib/ssh-preflight.sh)  
   ➜ Script avancé de préparation SSH (clé, known_hosts, ssh-agent).
 
-- [Ansible/run-ping-test.sh](../Ansible/run-ping-test.sh)  
+- [Ansible/run-ping-test.sh](../../Ansible/run-ping-test.sh)  
   ➜ Script d'orchestration pour tester la connectivité Ansible.
 
 ---
 
 ## 2️⃣ Préparation de l'environnement Ansible
 
-Dans [Ansible/README.md](../Ansible/README.md), le workflow recommandé est :
+Dans [Ansible/README.md](../../Ansible/README.md), le workflow recommandé est :
 
 1. **Validation initiale** ✅
 
@@ -84,7 +83,7 @@ Dans [Ansible/README.md](../Ansible/README.md), le workflow recommandé est :
 
 ## 3️⃣ Test de connectivité avec `run-ping-test.sh`
 
-Le script [Ansible/run-ping-test.sh](../Ansible/run-ping-test.sh) fournit une interface haut niveau :
+Le script [Ansible/run-ping-test.sh](../../Ansible/run-ping-test.sh) fournit une interface haut niveau :
 
 ```bash
 cd Ansible/
@@ -94,8 +93,8 @@ cd Ansible/
 Il se charge de :
 
 1. Vérifier les prérequis (binaire `ansible`, `ansible-inventory`, outils SSH, etc.).
-2. Valider l'inventaire (notamment `inventory/terraform.generated.yml`).
-3. Lancer un **SSH preflight** via [lib/ssh-preflight.sh](../Ansible/lib/ssh-preflight.sh) :
+2. Valider l'inventaire (notamment `inventory/hosts.yml`).
+3. Lancer un **SSH preflight** via [lib/ssh-preflight.sh](../../Ansible/lib/ssh-preflight.sh) :
    - auto-détection de la bonne clé privée,
    - nettoyage de `~/.ssh/known_hosts` si nécessaire,
    - gestion optionnelle de `ssh-agent`.
@@ -110,22 +109,22 @@ En cas de succès, tu dois voir des `SUCCESS` avec `"ping": "pong"` pour chaque 
 Quand tu veux vérifier rapidement la connectivité sans passer par les scripts, tu peux utiliser :
 
 ```bash
-cd /home/admin1/Documents/Projet_infra_devops/Ansible
+cd /media/james/DATA2/Projet_infra_devops/Ansible
 
-ANSIBLE_HOST_KEY_CHECKING=False \
 ansible all \
-  -i inventory/terraform.generated.yml \
+  -i inventory/hosts.yml \
   -u ansible \
-  --private-key=$HOME/.ssh/id_ed25519 \
+  --private-key=$HOME/.ssh/id_ed25519_admin1_nopass \
+  --ask-vault-pass \
   -m ping
 ```
 
 Cette commande :
 
-- Utilise l'inventaire généré par Terraform.
 - Se connecte en SSH avec l'utilisateur `ansible`.
-- Utilise explicitement ta clé privée `~/.ssh/id_ed25519`.
-- Désactive le check de `known_hosts` pour éviter les erreurs de type "REMOTE HOST IDENTIFICATION HAS CHANGED".
+- Utilise l’inventaire réellement maintenu dans le dépôt.
+- Utilise explicitement la clé privée `~/.ssh/id_ed25519_admin1_nopass`.
+- Demande le mot de passe Vault pour charger les variables chiffrées.
 
 Si tout est bien aligné (cloud-init, SSH, réseau), tous les hôtes répondent `"ping": "pong"` ✅.
 
@@ -134,10 +133,14 @@ Si tout est bien aligné (cloud-init, SSH, réseau), tous les hôtes répondent 
 ## 5️⃣ Pièges classiques côté Ansible
 
 - 🔑 **Mauvaise clé privée utilisée** :
-  - Solution : forcer `--private-key=~/.ssh/id_ed25519` ou ajuster `ansible_ssh_private_key_file` dans l'inventaire / `group_vars`.
+  - Solution : forcer `--private-key=~/.ssh/id_ed25519_admin1_nopass` ou ajuster `ansible_ssh_private_key_file` dans l'inventaire / `group_vars`.
 
 - 🧾 **Inventaire incohérent** :
-  - Solution : s'assurer que `terraform apply` vient d'être exécuté et que `inventory/terraform.generated.yml` correspond aux VMs actuelles.
+  - Solution : vérifier `inventory/hosts.yml` et l’IP réelle des VMs.
+
+- 🧹 **Host keys SSH obsolètes** :
+  - Symptôme : `REMOTE HOST IDENTIFICATION HAS CHANGED!`
+  - Solution : supprimer l’ancienne empreinte (`ssh-keygen -R <ip>`) puis retester.
 
 - 🌐 **Réseau non disponible** :
   - Solution : vérifier que les VMs ont bien booté, que les IPs sont correctes (`ping 172.16.100.x`), et que les firewalls ne bloquent pas SSH.
@@ -158,13 +161,13 @@ Une fois le `ping/pong` validé :
 - Tu peux aussi lancer directement :
 
   ```bash
-  ansible-playbook -i inventory/terraform.generated.yml playbooks/taiga.yml
+  ansible-playbook -i inventory/hosts.yml playbooks/taiga.yml --ask-vault-pass
   ```
 
 Pour comprendre les bonnes pratiques et les scripts en détail, voir :
 
-- [Ansible/README.md](../Ansible/README.md)
-- [Ansible/AUTOMATION_GUIDE.md](../Ansible/AUTOMATION_GUIDE.md)
+- [Ansible/README.md](../../Ansible/README.md)
+- [Ansible/AUTOMATION_GUIDE.md](../../Ansible/AUTOMATION_GUIDE.md)
 
 ---
 

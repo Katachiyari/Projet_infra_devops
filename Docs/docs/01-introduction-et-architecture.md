@@ -50,22 +50,22 @@ Ce projet a été conçu pour automatiser **de bout en bout** la création et la
 
 2. **Terraform**
    - Configuration du provider Proxmox dans [provider.tf](../provider.tf).
-   - Définition des VMs (noms, IPs, ressources) dans [variables.tf](../variables.tf) et `terraform.tfvars`.
-   - Ressource principale : [main.tf](../main.tf) avec `proxmox_virtual_environment_vm`.
+   - Définition des VMs (noms, IPs, ressources) dans [variables.tf](../../variables.tf) et `terraform.tfvars`.
+   - Ressource principale : [main.tf](../../main.tf) avec `proxmox_virtual_environment_vm`.
 
 3. **Initialisation cloud-init**
    - Terraform passe les paramètres d'initialisation (réseau + utilisateur) via le bloc `initialization`.
-   - Optionnellement, un fichier cloud-init détaillé est disponible dans [cloud-init/user-data.yaml.tftpl](../cloud-init/user-data.yaml.tftpl).
+   - Optionnellement, un fichier cloud-init détaillé est disponible dans [cloud-init/user-data.yaml.tftpl](../../cloud-init/user-data.yaml.tftpl).
 
 4. **Génération de l'inventaire Ansible**
-   - Terraform produit un fichier d'inventaire dans [Ansible/inventory/terraform.generated.yml](../Ansible/inventory/terraform.generated.yml).
+   - Terraform produit un fichier d'inventaire dans [Ansible/inventory/terraform.generated.yml](../../Ansible/inventory/terraform.generated.yml).
 
 5. **Ansible**
-   - Tests de connectivité avec [Ansible/run-ping-test.sh](../Ansible/run-ping-test.sh) ou une commande `ansible all -m ping`.
-   - Déploiement d'applications et de services via les playbooks dans [Ansible/playbooks](../Ansible/playbooks).
+   - Tests de connectivité avec [Ansible/run-ping-test.sh](../../Ansible/run-ping-test.sh) ou une commande `ansible all -m ping`.
+   - Déploiement d'applications et de services via les playbooks dans [Ansible/playbooks](../../Ansible/playbooks).
 
 6. **Qemu Guest Agent**
-   - Activé dans [main.tf](../main.tf) via le bloc `agent { enabled = true }`.
+   - Activé dans [main.tf](../../main.tf) via le bloc `agent { enabled = true }`.
    - Installé et démarré dans les VMs (via Ansible) pour une meilleure intégration Proxmox.
 
 
@@ -76,13 +76,13 @@ Ce projet a été conçu pour automatiser **de bout en bout** la création et la
 - [provider.tf](../provider.tf)  
   ➜ Déclare le provider Proxmox et configure l'accès API (endpoint + token).
 
-- [variables.tf](../variables.tf)  
+- [variables.tf](../../variables.tf)  
   ➜ Déclare les variables : endpoint, token, datastore, gateway, map des VMs, etc.
 
 - `terraform.tfvars` (non versionné)  
   ➜ Fournit les valeurs réelles : IPs, token Proxmox, clé publique SSH, etc.
 
-- [main.tf](../main.tf)  
+- [main.tf](../../main.tf)  
   ➜ Ressource `proxmox_virtual_environment_vm` qui décrit chaque VM :
   - clonage du template,
   - config CPU/RAM/disque,
@@ -90,24 +90,24 @@ Ce projet a été conçu pour automatiser **de bout en bout** la création et la
   - bloc `initialization` (IP + utilisateur `ansible` + clé SSH),
   - bloc `agent` pour Qemu Guest Agent.
 
-- [cloud-init/user-data.yaml.tftpl](../cloud-init/user-data.yaml.tftpl)  
+- [cloud-init/user-data.yaml.tftpl](../../cloud-init/user-data.yaml.tftpl)  
   ➜ Modèle cloud-init plus avancé (packages, sshd, sudo, etc.), utilisé comme référence.
 
 ### Côté Ansible
 
-- [Ansible/ansible.cfg](../Ansible/ansible.cfg)  
+- [Ansible/ansible.cfg](../../Ansible/ansible.cfg)  
   ➜ Paramètres globaux Ansible (inventaires, utilisateur par défaut, SSH, logs).
 
-- [Ansible/inventory/terraform.generated.yml](../Ansible/inventory/terraform.generated.yml)  
+- [Ansible/inventory/terraform.generated.yml](../../Ansible/inventory/terraform.generated.yml)  
   ➜ Inventaire dynamique généré par Terraform, basé sur les IPs définies.
 
-- [Ansible/lib/ssh-preflight.sh](../Ansible/lib/ssh-preflight.sh)  
+- [Ansible/lib/ssh-preflight.sh](../../Ansible/lib/ssh-preflight.sh)  
   ➜ Préparation SSH : choix de la bonne clé, nettoyage `known_hosts`, gestion d'`ssh-agent`.
 
-- [Ansible/run-ping-test.sh](../Ansible/run-ping-test.sh)  
+- [Ansible/run-ping-test.sh](../../Ansible/run-ping-test.sh)  
   ➜ Script haut niveau pour tester la connectivité SSH + Ansible sur toutes les VMs.
 
-- [Ansible/bootstrap.sh](../Ansible/bootstrap.sh) et [Ansible/validate.sh](../Ansible/validate.sh)  
+- [Ansible/bootstrap.sh](../../Ansible/bootstrap.sh) et [Ansible/validate.sh](../../Ansible/validate.sh)  
   ➜ Mise en place de l'environnement Ansible et validation globale.
 
 

@@ -50,14 +50,14 @@ Points importants ✅ :
 
 Les valeurs réelles (`proxmox_endpoint`, `proxmox_api_token`, etc.) sont fournies via :
 
-- [variables.tf](../variables.tf) (déclaration)
+- [variables.tf](../../variables.tf) (déclaration)
 - `terraform.tfvars` (valeurs locales, non versionnées)
 
 ---
 
 ## 3️⃣ Variables et définition des VMs
 
-Les variables clés sont définies dans [variables.tf](../variables.tf) :
+Les variables clés sont définies dans [variables.tf](../../variables.tf) :
 
 - 🔐 `proxmox_api_token` : token API Proxmox.
 - 🌐 `proxmox_endpoint` : URL HTTPs de l'API.
@@ -86,7 +86,7 @@ Les valeurs concrètes sont fournies dans `terraform.tfvars` (copié depuis `ter
 
 ## 4️⃣ Ressource principale : création des VMs
 
-La définition des VMs se trouve dans [main.tf](../main.tf) :
+La définition des VMs se trouve dans [main.tf](../../main.tf) :
 
 - Utilisation de `for_each` sur `var.nodes`.
 - Clonage du template `9000`.
@@ -155,13 +155,13 @@ resource "proxmox_virtual_environment_vm" "vm" {
 
 ## 5️⃣ Génération de l'inventaire Ansible
 
-Terraform génère un inventaire Ansible dans [Ansible/inventory/terraform.generated.yml](../Ansible/inventory/terraform.generated.yml) à l'aide d'une ressource de type `local_file` (définie dans [main.tf](../main.tf) ou un fichier associé).
+Terraform génère un inventaire Ansible dans [Ansible/inventory/terraform.generated.yml](../../Ansible/inventory/terraform.generated.yml) à l'aide d'une ressource de type `local_file` (définie dans [main.tf](../../main.tf) ou un fichier associé).
 
 Cet inventaire :
 
 - Contient les noms de VMs en cohérence avec `each.key` (ex. `git-lab`, `k3s-manager`, etc.).
 - Associe chaque hôte à son IP (`ansible_host`), issue de la variable `nodes`.
-- Est référencé automatiquement dans [Ansible/ansible.cfg](../Ansible/ansible.cfg).
+- Est référencé automatiquement dans [Ansible/ansible.cfg](../../Ansible/ansible.cfg).
 
 Résultat : aucun inventaire à maintenir à la main ✅.
 

@@ -1,4 +1,7 @@
-# Résolution : EdgeDoc (HedgeDoc) en 502 Bad Gateway + Healthcheck instable ✅
+# Résolution : EdgeDoc/BookStack en 502 Bad Gateway + Healthcheck instable ✅
+
+> Note de contexte (13/02/2026) : le rôle `edgedoc` peut désormais déployer BookStack.
+> Le FQDN et le backend (`edgedoc.lab.local` -> `172.16.100.20:8080`) restent inchangés.
 
 ## Contexte 🧭
 EdgeDoc (HedgeDoc) est exposé via un reverse-proxy Nginx en HTTPS sur :

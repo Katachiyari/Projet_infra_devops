@@ -60,6 +60,8 @@ gitlab_ldap_enabled: false
 gitlab_runner_executor: "docker"
 gitlab_runner_docker_image: "docker:27-dind"
 gitlab_runner_concurrent: 4
+# Best practice: keep the secret in Vault and map it to the runtime variable used by templates.
+gitlab_runner_token: "{{ vault_gitlab_runner_token | default('') }}"
 
 # =============================================================================
 # Rétrocompatibilité (à supprimer après migration des templates)

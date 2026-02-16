@@ -18,10 +18,12 @@
       - vault_edgedoc_db_password is defined
       - vault_edgedoc_db_root_password is defined
       - vault_edgedoc_session_secret is defined
+      - vault_edgedoc_app_key is defined or vault_edgedoc_session_secret is defined
     fail_msg: >
       Secrets Vault manquants. Définir :
       vault_edgedoc_db_password, vault_edgedoc_db_root_password,
-      vault_edgedoc_session_secret (dans group_vars/all/vault.yml).
+      vault_edgedoc_session_secret et idéalement vault_edgedoc_app_key
+      (dans group_vars/all/edgedoc.vault.yml).
   become: true
 
 # -----------------------------------------------------------------------------
@@ -34,7 +36,7 @@
     mode: "0755"
   loop:
     - "{{ edgedoc_install_dir }}"
-    - "{{ edgedoc_install_dir }}/uploads"
+    - "{{ edgedoc_install_dir }}/app-config"
     - "{{ edgedoc_install_dir }}/db-data"
   become: true
 
@@ -42,12 +44,12 @@
 # Permissions : certains conteneurs écrivent avec des UID/GID spécifiques.
 # Ici, on garde ton approche, en l'encadrant.
 # -----------------------------------------------------------------------------
-- name: Assurer les permissions du répertoire uploads (UID 1000)
+- name: Assurer les permissions du répertoire app-config (UID/GID applicatifs)
   ansible.builtin.file:
-    path: "{{ edgedoc_install_dir }}/uploads"
+    path: "{{ edgedoc_install_dir }}/app-config"
     state: directory
-    owner: 1000
-    group: 1000
+    owner: "{{ edgedoc_puid }}"
+    group: "{{ edgedoc_pgid }}"
     mode: "0775"
     recurse: true
   become: true

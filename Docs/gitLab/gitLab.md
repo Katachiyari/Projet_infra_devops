@@ -224,43 +224,37 @@
 ### Phase 4 : Installation GitLab Runner (CI/CD)
 
 ```
-1. Installation Runner (même VM ou VM dédiée)
-   └─> curl -L https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh | bash
-   └─> apt install gitlab-runner
+1. Créer un Instance Runner dans GitLab UI
+   └─> Admin Area → CI/CD → Runners → New instance runner
+       ├─> Tags : docker, prod-like
+       └─> Récupérer le Runner authentication token (glrt-...)
 
-2. Enregistrement Runner auprès GitLab
-   └─> gitlab-runner register
-       ├─> GitLab URL : https://gitlab.lab.local
-       ├─> Registration token : (depuis GitLab Admin → Runners)
-       ├─> Description : "docker-runner-01"
-       ├─> Tags : docker, linux, production
-       ├─> Executor : docker
-       └─> Default Docker image : docker:24-dind
+2. Stocker le token dans Ansible Vault (SSOT)
+   └─> Fichier : Ansible/secrets/gitlab.yml
+       └─> vault_gitlab_runner_token: "glrt-..."
 
-3. Configuration Runner
-   └─> /etc/gitlab-runner/config.toml
-       └─> [[runners]]
-             name = "docker-runner-01"
-             url = "https://gitlab.lab.local"
-             token = "xxx"
-             executor = "docker"
-             [runners.docker]
-               image = "docker:24-dind"
-               privileged = true
-               volumes = ["/var/run/docker.sock:/var/run/docker.sock", "/cache"]
-               pull_policy = "if-not-present"
+3. Déploiement runner via Ansible (sur git-lab)
+   └─> playbook : Ansible/playbooks/gitlab.yml
+   └─> stack : GitLab + gitlab-runner (Docker Compose)
+   └─> URL runner : https://git-lab.lab.local
+   └─> Executor : docker (image docker:27-dind)
 
-4. Démarrage Runner
-   └─> gitlab-runner start
-   └─> Vérification : GitLab UI → Admin → Runners
-       └─> ✅ docker-runner-01 (Active)
+4. Vérifications techniques
+   └─> config : /srv/gitlab/runner/config.toml (token présent)
+   └─> sudo docker exec gitlab-runner gitlab-runner verify
+       └─> Verifying runner... is valid
+   └─> GitLab UI : runner Online
 
-5. Test pipeline
-   └─> Créer .gitlab-ci.yml dans projet
-   └─> Git push → Pipeline déclenché
-   └─> Runner exécute jobs
-   └─> Résultat visible dans GitLab UI
+5. Test pipeline réel (smoke test)
+   └─> Projet test : python_hardened
+   └─> .gitlab-ci.yml avec image cgr.dev/chainguard/python:latest-dev
+   └─> Job taggé : docker
+   └─> Push → pipeline exécuté par le runner
 ```
+
+Références locales de mise en oeuvre :
+- Docs/gitLab/etape3.md
+- Docs/gitLab/etape4-runner-python-hardened.md
 
 
 ### Phase 5 : Utilisation Quotidienne (Workflow Dev)
@@ -2029,4 +2023,3 @@ after_script:
 ***
 
 **GitLab est maintenant documenté de A à Z !** 🦊 Plateforme DevOps complète prête pour la production ! 🚀
-

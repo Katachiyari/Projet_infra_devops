@@ -99,4 +99,72 @@ ansible-inventory --list gitlab_hosts | jq '.gitlab_hosts[0].gitlab_ip'
 # "172.16.100.40"
 ```
 
-**Prochaine** : Étape 3 Templates (tapez "suivant"). [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/collection_5e74f233-dbdf-418d-afa1-e893b6588eda/ecc3caea-4f39-4230-ad18-cc27f35b9c13/https-github-com-katachiyari-p-bz7svhA9SI2Zm9XDbnnP5Q.md)
+---
+
+## 📖 Mise à jour (2026-02-16) : Runner Docker GitLab validé (mode pas à pas)
+
+**Objectif** : connecter un runner Docker `instance` sur `git-lab.lab.local` avec Vault + Ansible, en suivant une méthode proche des bonnes pratiques officielles GitLab Runner.
+
+### Étapes validées
+
+1. **Créer un Instance Runner dans l'UI GitLab**
+   - `Admin Area -> CI/CD -> Runners -> New instance runner`
+   - Tags utilisés : `docker,prod-like`
+   - Option `Run untagged jobs` : désactivée
+   - Récupération du **Runner authentication token** (`glrt-...`)
+
+2. **Stocker le token dans Vault**
+   - Fichier : `Ansible/secrets/gitlab.yml`
+   - Variable source de vérité :
+   ```yaml
+   vault_gitlab_runner_token: "glrt-..."
+   ```
+
+3. **Mapper automatiquement le token Vault vers la variable runtime**
+   - Fichier : `Ansible/roles/gitlab/defaults/main.yml`
+   ```yaml
+   gitlab_runner_token: "{{ vault_gitlab_runner_token | default('') }}"
+   ```
+   - But : éviter la duplication manuelle des variables et garder une SSOT claire.
+
+4. **Rejouer le playbook GitLab**
+   ```bash
+   cd /media/james/DATA2/Projet_infra_devops/Ansible
+   ANSIBLE_LOCAL_TEMP=/tmp/.ansible/local \
+   ANSIBLE_REMOTE_TMP=/tmp/.ansible/tmp \
+   ANSIBLE_FACT_PATH=/tmp/.ansible/facts \
+   ansible-playbook -i inventory/hosts.yml playbooks/gitlab.yml \
+     --limit gitlab_hosts \
+     -u ansible --private-key ~/.ssh/id_ed25519_admin1_nopass \
+     --ask-vault-pass
+   ```
+
+5. **Contrôler la configuration runner**
+   - Fichier cible : `/srv/gitlab/runner/config.toml`
+   - Vérifier la présence de :
+   ```toml
+   token = "glrt-..."
+   ```
+
+6. **Vérifier le lien runner <-> GitLab**
+   ```bash
+   sudo docker exec gitlab-runner gitlab-runner verify
+   ```
+   - Résultat attendu :
+   - `Verifying runner... is valid`
+   - UI GitLab : runner en état `Online`.
+
+### Dépannage rencontré (et résolution)
+
+- **Erreur** : `jsonschema ... /runners/0/token ... got 0`
+  - Cause : token absent/variable non mappée dans `config.toml`.
+  - Correctif : mapping `gitlab_runner_token` depuis `vault_gitlab_runner_token`.
+
+- **Erreur Ansible** : `Failed to create temporary directory`
+  - Correctif : utiliser `ANSIBLE_LOCAL_TEMP`, `ANSIBLE_REMOTE_TMP`, `ANSIBLE_FACT_PATH` sous `/tmp`.
+
+---
+
+**Prochaines docs** :
+- `Docs/gitLab/etape3.md` : templates GitLab/Runner (SSOT + token Vault).
+- `Docs/gitLab/etape4-runner-python-hardened.md` : test end-to-end runner avec image Python hardened.

@@ -4,7 +4,7 @@
 # Fichier : roles/edgedoc/defaults/main.yml
 #
 # Objectif :
-# - Déployer HedgeDoc (EdgeDoc) + MariaDB via Docker Compose
+# - Déployer BookStack (remplacement EdgeDoc) + MariaDB via Docker Compose
 # - Appliquer une configuration SSOT (Source Unique de Vérité)
 # - Éviter les secrets en clair (DevSecOps) : Vault obligatoire
 # =============================================================================
@@ -23,7 +23,7 @@ edgedoc_scheme: "https"
 # - À ce jour, pas de DHI “officielle” standard pour HedgeDoc/MariaDB dans ce projet.
 # - On privilégie donc les images officielles amont + versions pinées.
 # -----------------------------------------------------------------------------
-edgedoc_image: "quay.io/hedgedoc/hedgedoc:1.9.9"
+edgedoc_image: "lscr.io/linuxserver/bookstack:latest"
 mariadb_image: "mariadb:10.11"
 
 # -----------------------------------------------------------------------------
@@ -31,8 +31,8 @@ mariadb_image: "mariadb:10.11"
 # -----------------------------------------------------------------------------
 edgedoc_db_host: "edgedoc-db"
 edgedoc_db_port: 3306
-edgedoc_db_name: "hedgedoc"
-edgedoc_db_user: "hedgedoc"
+edgedoc_db_name: "bookstack"
+edgedoc_db_user: "bookstack"
 
 # -----------------------------------------------------------------------------
 # Secrets (doivent venir d'Ansible Vault) - OBLIGATOIRE
@@ -40,10 +40,11 @@ edgedoc_db_user: "hedgedoc"
 edgedoc_db_password: "{{ vault_edgedoc_db_password }}"
 edgedoc_db_root_password: "{{ vault_edgedoc_db_root_password }}"
 edgedoc_session_secret: "{{ vault_edgedoc_session_secret }}"
+edgedoc_app_key: "{{ vault_edgedoc_app_key | default(vault_edgedoc_session_secret, true) }}"
 
 # -----------------------------------------------------------------------------
-# Paramètres fonctionnels (SSOT) - évite le hardcoding dans le compose
+# Paramètres fonctionnels (SSOT)
 # -----------------------------------------------------------------------------
-edgedoc_allow_anonymous: true
-edgedoc_allow_anonymous_edits: true
-edgedoc_default_permission: "freely"
+edgedoc_tz: "Europe/Paris"
+edgedoc_puid: 1000
+edgedoc_pgid: 1000

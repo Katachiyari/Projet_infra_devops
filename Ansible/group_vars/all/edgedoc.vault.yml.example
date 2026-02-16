@@ -3,3 +3,4 @@
 vault_edgedoc_db_password: "CHANGE_ME_EDGEDOC_DB_PASSWORD"
 vault_edgedoc_db_root_password: "CHANGE_ME_EDGEDOC_DB_ROOT_PASSWORD"
 vault_edgedoc_session_secret: "CHANGE_ME_EDGEDOC_SESSION_SECRET"
+vault_edgedoc_app_key: "base64:CHANGE_ME_BOOKSTACK_APP_KEY"

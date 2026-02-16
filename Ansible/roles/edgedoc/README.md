@@ -1,6 +1,6 @@
-# Ansible Role: EdgeDoc
+# Ansible Role: EdgeDoc (BookStack)
 
-This role deploys and configures EdgeDoc collaborative editor using Docker, following DevSecOps, SSOT, and automation best practices.
+This role deploys and configures BookStack using Docker, while keeping the existing EdgeDoc exposure contract (`edgedoc.lab.local` on backend port `8080`) to avoid DNS and reverse-proxy changes.
 
 ## Structure
 - `tasks/`: Main tasks for installation, configuration, and deployment
@@ -15,6 +15,7 @@ This role deploys and configures EdgeDoc collaborative editor using Docker, foll
 - Bind9 DNS
 - Monitoring integration
 - Security: UFW, Trivy, headers
+- Vault secrets in `group_vars/all/edgedoc.vault.yml`
 
 ## Usage
 Include this role in your playbook:

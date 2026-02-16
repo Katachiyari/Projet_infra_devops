@@ -45,6 +45,10 @@ check_interval = 0
     # Mode privilégié requis pour certains usages (ex: Docker-in-Docker).
     privileged = true
 
+    # Résolution DNS forcée dans les conteneurs de jobs (helper + build).
+    # Evite les erreurs "Could not resolve host" si DNS lab non disponible dans Docker.
+    extra_hosts = ["{{ gitlab_fqdn }}:{{ gitlab_runner_gitlab_resolve_ip }}", "{{ gitlab_registry_fqdn }}:{{ gitlab_runner_registry_resolve_ip }}"]
+
     # Volumes :
     # - /cache : permet l'utilisation du cache CI.
     # - /var/run/docker.sock : accès au Docker hôte (Docker executor).

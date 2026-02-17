@@ -218,6 +218,112 @@
    └─> Résultat scan visible dans Harbor UI
 ```
 
+***
+
+## ✅ Runbook : Test "PC client" (Docker -> Harbor)
+
+Objectif : depuis une machine cliente (ton poste), construire une image locale et la pousser dans Harbor, puis valider que le registre sert bien le manifest et que le pull fonctionne.
+
+### Prérequis côté client
+
+#### A) Résolution DNS
+
+```bash
+getent hosts harbor.lab.local
+```
+
+Attendu : une IP (chez toi, le reverse-proxy `172.16.100.253`).
+
+#### B) Confiance TLS (certificat)
+
+Symptôme : `x509: certificate signed by unknown authority` sur `docker login`/`docker push`.
+
+Solution automatisée (recommandée) : exécuter le tag Ansible qui installe la CA système + la CA Docker et corrige DNS côté backends.
+
+```bash
+cd Ansible
+ANSIBLE_LOCAL_TEMP=/tmp/.ansible/local \
+ANSIBLE_REMOTE_TMP=/tmp/.ansible/tmp \
+ANSIBLE_FACT_PATH=/tmp/.ansible/facts \
+ANSIBLE_HOST_KEY_CHECKING=False \
+ansible-playbook -i inventory/hosts.yml playbooks/harbor_portainer.yml \
+  --tags harbor_client_prereq \
+  -u ansible --private-key "$HOME/.ssh/id_ed25519_admin1_nopass"
+```
+
+#### C) Droits Docker
+
+Symptôme : `permission denied while trying to connect to the docker API at unix:///var/run/docker.sock`.
+
+```bash
+sudo usermod -aG docker "$USER"
+newgrp docker
+docker ps
+```
+
+### Étapes de test (build -> tag -> login -> push -> manifest -> pull -> run)
+
+Exemple de projet Harbor : `lab`.
+
+#### 1) Dossier de test + Dockerfile minimal
+
+```bash
+mkdir -p ~/harbor-test
+cd ~/harbor-test
+
+cat > Dockerfile <<'EOF'
+FROM alpine:3.20
+CMD ["sh", "-c", "echo 'Hello depuis Harbor'; sleep 3600"]
+EOF
+```
+
+#### 2) Build local
+
+```bash
+docker build -t app-test:1.0 .
+docker images | grep app-test
+```
+
+#### 3) Login Harbor
+
+```bash
+docker login harbor.lab.local
+# admin / Admin1234
+```
+
+#### 4) Tag vers Harbor + push
+
+```bash
+docker tag app-test:1.0 harbor.lab.local/lab/app-test:1.0
+docker push harbor.lab.local/lab/app-test:1.0
+```
+
+#### 5) Vérifier le manifest servi par le registre
+
+```bash
+docker manifest inspect harbor.lab.local/lab/app-test:1.0
+```
+
+Attendu : JSON avec `schemaVersion: 2` et une plateforme `linux/amd64`.
+
+#### 6) Vérifier le pull et l'exécution
+
+```bash
+docker pull harbor.lab.local/lab/app-test:1.0
+docker run --rm harbor.lab.local/lab/app-test:1.0
+```
+
+### Erreurs fréquentes
+
+- `dial tcp: lookup harbor.lab.local: no such host`
+  - DNS client non OK (voir section DNS).
+- `x509: certificate signed by unknown authority`
+  - CA non installée côté client (voir section TLS/Ansible).
+- `repository ... not found`
+  - Projet Harbor inexistant, ou mauvais nom (sensible à la casse), ou repo/tag mal écrit.
+- `permission denied ... docker.sock`
+  - utilisateur non autorisé à parler à Docker (voir section Droits Docker).
+
 
 ***
 
@@ -2179,4 +2285,3 @@ openssl s_client -connect harbor.lab.local:443 -showcerts
 ***
 
 **Harbor est maintenant documenté de A à Z !** 🚢 Registry Docker privé sécurisé et prêt pour la production ! 🔒
-

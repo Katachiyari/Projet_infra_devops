@@ -57,6 +57,7 @@ ansible -i inventory/hosts.yml all -m ping -u ansible \
 - `Docs/stackGlobal/SSOT-DevSecOps-stack.md` : architecture et flux SSOT.
 - `Docs/NGINX_reverse_proxy/NGINX_reverse_proxy.md` : design reverse-proxy.
 - `Docs/gitLab/gitLab.md` : cadrage GitLab.
+- `Docs/Harbor/Harbor.md` : Harbor + runbook test "PC client" (build/tag/push + manifest/pull).
 - `Docs/taiga_edgedoc/README.md` : intégration Taiga/EdgeDoc.
 - `Docs/stackMonitoring/stackMonitoring.md` : monitoring.
 - `Docs/bind9/bind9.md` : DNS interne.

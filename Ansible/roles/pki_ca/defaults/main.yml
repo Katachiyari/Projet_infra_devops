@@ -17,6 +17,9 @@ pki_ca_wildcard_ext_file: "{{ pki_ca_root_dir }}/wildcard.lab.local.ext"
 
 pki_ca_trust_store_path: "/usr/local/share/ca-certificates/lab-root-ca.crt"
 
+pki_ca_publish_to_nginx: true
+pki_ca_nginx_ssl_dir: "/etc/nginx/ssl"
+
 pki_ca_server_certificates:
   - name: "harbor.lab.local"
     key_file: "{{ pki_ca_root_dir }}/harbor.lab.local.key"

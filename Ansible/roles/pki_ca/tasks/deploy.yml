@@ -19,6 +19,37 @@
     cmd: "openssl req -new -key {{ pki_ca_wildcard_key_file }} -out {{ pki_ca_wildcard_csr_file }} -subj '/C=FR/ST=IDF/L=Paris/O=Lab/CN=*.lab.local'"
     creates: "{{ pki_ca_wildcard_csr_file }}"
 
+- name: Check wildcard certificate chain against root CA
+  ansible.builtin.command:
+    cmd: "openssl verify -CAfile {{ pki_ca_root_cert_file }} {{ pki_ca_wildcard_cert_file }}"
+  register: pki_ca_wildcard_chain_check
+  failed_when: false
+  changed_when: false
+
+- name: Check wildcard certificate and key match
+  ansible.builtin.shell: >-
+    test
+    "$(openssl x509 -noout -modulus -in {{ pki_ca_wildcard_cert_file }} | openssl md5)"
+    =
+    "$(openssl rsa -noout -modulus -in {{ pki_ca_wildcard_key_file }} | openssl md5)"
+  register: pki_ca_wildcard_keypair_check
+  failed_when: false
+  changed_when: false
+
+- name: Remove invalid wildcard certificate
+  ansible.builtin.file:
+    path: "{{ pki_ca_wildcard_cert_file }}"
+    state: absent
+  register: pki_ca_wildcard_cert_removed
+  when:
+    - (pki_ca_wildcard_chain_check.rc is defined and pki_ca_wildcard_chain_check.rc != 0) or
+      (pki_ca_wildcard_keypair_check.rc is defined and pki_ca_wildcard_keypair_check.rc != 0)
+
+- name: Regenerate wildcard CSR after certificate/key mismatch
+  ansible.builtin.command:
+    cmd: "openssl req -new -key {{ pki_ca_wildcard_key_file }} -out {{ pki_ca_wildcard_csr_file }} -subj '/C=FR/ST=IDF/L=Paris/O=Lab/CN=*.lab.local'"
+  when: pki_ca_wildcard_cert_removed is defined and pki_ca_wildcard_cert_removed.changed
+
 - name: Generate wildcard certificate
   ansible.builtin.command:
     cmd: "openssl x509 -req -in {{ pki_ca_wildcard_csr_file }} -CA {{ pki_ca_root_cert_file }} -CAkey {{ pki_ca_root_key_file }} -CAcreateserial -out {{ pki_ca_wildcard_cert_file }} -days {{ pki_ca_server_validity_days }} -sha256 -extfile {{ pki_ca_wildcard_ext_file }}"
@@ -55,3 +86,42 @@
   ansible.builtin.command:
     cmd: update-ca-certificates
   changed_when: false
+
+- name: Ensure Nginx SSL directory exists
+  ansible.builtin.file:
+    path: "{{ pki_ca_nginx_ssl_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  when: pki_ca_publish_to_nginx | bool
+
+- name: Publish CA root certificate for Nginx TLS validation
+  ansible.builtin.copy:
+    src: "{{ pki_ca_root_cert_file }}"
+    dest: "{{ pki_ca_nginx_ssl_dir }}/root-ca.crt"
+    owner: root
+    group: root
+    mode: "0644"
+    remote_src: true
+  when: pki_ca_publish_to_nginx | bool
+
+- name: Publish wildcard certificate for Nginx TLS termination
+  ansible.builtin.copy:
+    src: "{{ pki_ca_wildcard_cert_file }}"
+    dest: "{{ pki_ca_nginx_ssl_dir }}/wildcard.lab.local.crt"
+    owner: root
+    group: root
+    mode: "0644"
+    remote_src: true
+  when: pki_ca_publish_to_nginx | bool
+
+- name: Publish wildcard private key for Nginx TLS termination
+  ansible.builtin.copy:
+    src: "{{ pki_ca_wildcard_key_file }}"
+    dest: "{{ pki_ca_nginx_ssl_dir }}/wildcard.lab.local.key"
+    owner: root
+    group: root
+    mode: "0600"
+    remote_src: true
+  when: pki_ca_publish_to_nginx | bool

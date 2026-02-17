@@ -2,6 +2,77 @@
 
 **Objectif** : valider de bout en bout qu'un runner `docker` exécute un job CI réel.
 
+## 0. Déployer le runner
+
+Avant de tester un pipeline, il faut comprendre où le runner est déclaré dans votre code.
+
+### Les 5 fichiers à lire (ordre recommandé)
+
+1. `Ansible/playbooks/gitlab.yml`
+- Lance le rôle `gitlab` sur `gitlab_hosts`.
+
+2. `Ansible/secrets/gitlab.yml` (ou `Ansible/secrets/gitlab.yml.example`)
+- Contient le secret `vault_gitlab_runner_token`.
+
+3. `Ansible/roles/gitlab/defaults/main.yml`
+- Définit les variables runner (`executor`, image, concurrence, token).
+
+4. `Ansible/roles/gitlab/templates/docker-compose.yml.j2`
+- Déclare le service conteneur `gitlab-runner`.
+
+5. `Ansible/roles/gitlab/templates/runner-config.toml.j2`
+- Génère le `config.toml` réel avec `[[runners]]`.
+
+### Flux simple (ce qui se passe vraiment)
+
+1. Vous mettez le token dans Vault (`vault_gitlab_runner_token`).
+2. Le rôle mappe ce token vers `gitlab_runner_token`.
+3. Ansible rend `runner-config.toml.j2` en `config.toml`.
+4. Le conteneur `gitlab-runner` démarre avec ce `config.toml`.
+5. Le runner apparaît `Online` dans GitLab UI.
+
+### Extraits minimaux à expliquer dans la doc
+
+```yaml
+# Ansible/roles/gitlab/defaults/main.yml
+gitlab_runner_executor: "docker"
+gitlab_runner_docker_image: "docker:27-dind"
+gitlab_runner_concurrent: 4
+gitlab_runner_token: "{{ vault_gitlab_runner_token | default('') }}"
+```
+
+```toml
+# Ansible/roles/gitlab/templates/runner-config.toml.j2
+[[runners]]
+  name = "gitlab-runner"
+  url = "{{ gitlab_scheme }}://{{ gitlab_fqdn }}"
+  token = "{{ gitlab_runner_token }}"
+  executor = "{{ gitlab_runner_executor }}"
+  [runners.docker]
+    image = "{{ gitlab_runner_docker_image }}"
+    privileged = true
+    volumes = ["/cache", "/var/run/docker.sock:/var/run/docker.sock"]
+```
+
+### Déploiement / mise à jour du runner
+
+```bash
+cd /media/james/DATA2/Projet_infra_devops/Ansible
+ansible-playbook -i inventory/hosts.yml playbooks/gitlab.yml --limit gitlab_hosts -u ansible --private-key ~/.ssh/id_ed25519_admin1_nopass --ask-vault-pass
+```
+
+### Vérifications après déploiement
+
+```bash
+# config rendue sur la VM GitLab
+ssh -i ~/.ssh/id_ed25519_admin1_nopass -o IdentitiesOnly=yes ansible@172.16.100.40 "sudo sed -n '1,140p' /srv/gitlab/runner/config.toml"
+
+# état du runner dans le conteneur
+ssh -i ~/.ssh/id_ed25519_admin1_nopass -o IdentitiesOnly=yes ansible@172.16.100.40 "sudo docker exec gitlab-runner gitlab-runner verify"
+```
+
+Attendu : `Verifying runner... is valid`.
+
 ## 1. Préparer le projet GitLab
 
 Créer un projet vide (ex: `python_hardened`) dans GitLab.

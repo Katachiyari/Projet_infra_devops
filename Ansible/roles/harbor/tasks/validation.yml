@@ -10,6 +10,8 @@
     url: "https://127.0.0.1/api/v2.0/health"
     headers:
       Host: "{{ harbor_hostname }}"
+    # validate_certs=no car l'appel passe par 127.0.0.1 avec un Host header ;
+    # le certificat TLS est émis pour harbor.lab.local, pas pour localhost.
     validate_certs: no
     status_code: 200
   register: harbor_https_health

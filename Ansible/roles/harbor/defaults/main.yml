@@ -1,6 +1,6 @@
 ---
 # Defaults for Harbor role (Mission 2)
-
+#commentaire en FR
 harbor_version: "v2.11.1"
 harbor_offline_installer_url: "https://github.com/goharbor/harbor/releases/download/{{ harbor_version }}/harbor-offline-installer-{{ harbor_version }}.tgz"
 

@@ -1,6 +1,123 @@
 ---
 # Playbook Mission 2 - Harbor + Portainer (HTTP backends)
 
+- name: Configure backend Harbor prerequisites (DNS + CA trust)
+  hosts: tools_hosts:harbor_portainer_hosts:gitlab_hosts:monitoring_hosts:k3s_manager_hosts:k3s_worker_hosts
+  become: true
+  gather_facts: true
+  vars:
+    harbor_registry_fqdn: "harbor.lab.local"
+    harbor_dns_server: "172.16.100.254"
+    harbor_dns_domain: "lab.local"
+    harbor_ca_source_host: "reverse-proxy"
+    harbor_ca_source_path: "/etc/nginx/ssl/root-ca.crt"
+
+  tasks:
+    - name: Read reverse-proxy root CA certificate
+      ansible.builtin.slurp:
+        src: "{{ harbor_ca_source_path }}"
+      delegate_to: "{{ harbor_ca_source_host }}"
+      run_once: true
+      register: harbor_root_ca_slurp
+      tags: ["harbor_client_prereq"]
+
+    - name: Ensure systemd-resolved drop-in directory exists
+      ansible.builtin.file:
+        path: /etc/systemd/resolved.conf.d
+        state: directory
+        mode: "0755"
+      when: ansible_facts.service_mgr == "systemd"
+      tags: ["harbor_client_prereq"]
+
+    - name: Configure split DNS for lab.local
+      ansible.builtin.copy:
+        dest: /etc/systemd/resolved.conf.d/lab-local-dns.conf
+        mode: "0644"
+        content: |
+          [Resolve]
+          DNS={{ harbor_dns_server }}
+          Domains=~{{ harbor_dns_domain }} {{ harbor_dns_domain }}
+          FallbackDNS=8.8.8.8 1.1.1.1
+      when: ansible_facts.service_mgr == "systemd"
+      notify: Restart systemd-resolved
+      tags: ["harbor_client_prereq"]
+
+    - name: Trust lab root CA in system trust store
+      ansible.builtin.copy:
+        dest: /usr/local/share/ca-certificates/lab-root-ca.crt
+        content: "{{ harbor_root_ca_slurp.content | b64decode }}"
+        mode: "0644"
+      register: harbor_system_ca
+      tags: ["harbor_client_prereq"]
+
+    - name: Update system CA certificates
+      ansible.builtin.command: update-ca-certificates
+      when: harbor_system_ca.changed
+      changed_when: true
+      tags: ["harbor_client_prereq"]
+
+    - name: Check if Docker CLI is installed
+      ansible.builtin.command: docker --version
+      register: harbor_docker_cli
+      changed_when: false
+      failed_when: false
+      tags: ["harbor_client_prereq"]
+
+    - name: Ensure Docker trust directory exists for Harbor
+      ansible.builtin.file:
+        path: "/etc/docker/certs.d/{{ harbor_registry_fqdn }}"
+        state: directory
+        mode: "0755"
+      when: harbor_docker_cli.rc == 0
+      tags: ["harbor_client_prereq"]
+
+    - name: Install Harbor CA in Docker trust store
+      ansible.builtin.copy:
+        dest: "/etc/docker/certs.d/{{ harbor_registry_fqdn }}/ca.crt"
+        content: "{{ harbor_root_ca_slurp.content | b64decode }}"
+        mode: "0644"
+      when: harbor_docker_cli.rc == 0
+      tags: ["harbor_client_prereq"]
+
+    - name: Apply DNS changes before validation
+      ansible.builtin.meta: flush_handlers
+      tags: ["harbor_client_prereq"]
+
+    - name: Validate DNS resolution for Harbor registry
+      ansible.builtin.command: "getent hosts {{ harbor_registry_fqdn }}"
+      register: harbor_dns_getent
+      changed_when: false
+      failed_when: false
+      tags: ["harbor_client_prereq"]
+
+    - name: Add Harbor fallback mapping in /etc/hosts when DNS is unavailable
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: '^\s*172\.16\.100\.253\s+harbor\.lab\.local(\s|$)'
+        line: "172.16.100.253 harbor.lab.local"
+        state: present
+      when: harbor_dns_getent.rc != 0
+      tags: ["harbor_client_prereq"]
+
+    - name: Re-check Harbor resolution after fallback
+      ansible.builtin.command: "getent hosts {{ harbor_registry_fqdn }}"
+      register: harbor_dns_getent_final
+      changed_when: false
+      tags: ["harbor_client_prereq"]
+
+    - name: Ensure Harbor DNS resolves to reverse-proxy IP
+      ansible.builtin.assert:
+        that:
+          - "'172.16.100.253' in harbor_dns_getent_final.stdout"
+        fail_msg: "DNS {{ harbor_registry_fqdn }} does not resolve to 172.16.100.253 on {{ inventory_hostname }}."
+      tags: ["harbor_client_prereq"]
+
+  handlers:
+    - name: Restart systemd-resolved
+      ansible.builtin.service:
+        name: systemd-resolved
+        state: restarted
+
 - name: Deploy Harbor and Portainer on registry VM
   hosts: harbor_portainer_hosts
   become: true

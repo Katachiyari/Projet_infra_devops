@@ -1,4 +1,4 @@
-# 🌐 Bind9 : Serveur DNS Local
+# 🌐 Bind9 : DNS interne du lab (SSOT)
 
 
 ***
@@ -29,16 +29,16 @@
 │  VM : dns-server (172.16.100.254)                          │
 │  ├─ Bind9 (port 53 UDP/TCP)                                │
 │  ├─ Zone : lab.local (zone interne)                        │
-│  └─ Forwarders : 1.1.1.1, 1.0.0.1 (DNS publics Cloudflare) │
+│  └─ Forwarders : 1.1.1.1, 9.9.9.9 (ex: Cloudflare/Quad9)   │
 │                                                             │
 │  Toutes VMs → DNS : 172.16.100.254                         │
-│  ├─ harbor.lab.local → 172.16.100.2                        │
-│  ├─ gitlab.lab.local → 172.16.100.30                       │
-│  ├─ grafana.lab.local → 172.16.100.40 (CNAME monitoring)   │
+│  ├─ harbor.lab.local → 172.16.100.253                      │
+│  ├─ git-lab.lab.local → 172.16.100.253                     │
+│  ├─ grafana.lab.local → 172.16.100.253                     │
 │  └─ *.lab.local → Résolution interne                       │
 │                                                             │
 │  Requêtes externes (google.com, github.com)                │
-│  └─ Forward vers Cloudflare DNS (1.1.1.1)                  │
+│  └─ Forward vers DNS publics (ex: 1.1.1.1/9.9.9.9)          │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -47,6 +47,23 @@
 ***
 
 ## 📍 Cycle de vie : Bind9
+
+## ✅ Ce qui est vrai dans ce projet (SSOT)
+
+Source de vérité (zones + records) :
+- `Ansible/inventory/host_vars/bind9dns.yml`
+
+Serveur DNS :
+- host inventory : `bind9dns`
+- IP : `172.16.100.254`
+
+Reverse-proxy (cible des FQDN `*.lab.local`) :
+- IP : `172.16.100.253`
+
+Zones gérées :
+- `lab.local` (services exposés via reverse-proxy)
+- `jdk.lab` (zone interne de test/historique)
+
 
 ### Phase 1 : Provisionnement VM DNS (Terraform)
 
@@ -80,7 +97,7 @@
    └─> /etc/bind/named.conf.options
        ├─> Listen : 172.16.100.254 + localhost
        ├─> Allow-query : 172.16.100.0/24 (réseau local)
-       ├─> Forwarders : 1.1.1.1, 1.0.0.1 (Cloudflare)
+       ├─> Forwarders : 1.1.1.1, 9.9.9.9 (ex: Cloudflare/Quad9)
        ├─> DNSSEC : validation auto
        └─> Recursion : enabled (serveur récursif)
 
@@ -118,11 +135,11 @@
 2. Ansible ajuste systemd-resolved (Ubuntu 24.04)
    └─> /etc/systemd/resolved.conf
        ├─> DNS=172.16.100.254 1.1.1.1
-       ├─> FallbackDNS=1.0.0.1
+       ├─> FallbackDNS=9.9.9.9
        └─> Domains=lab.local
 
 3. Test résolution
-   └─> dig gitlab.lab.local @172.16.100.254
+   └─> dig git-lab.lab.local @172.16.100.254
    └─> nslookup harbor.lab.local
    └─> ping grafana.lab.local
 ```
@@ -131,8 +148,8 @@
 ### Phase 4 : Ajout Nouveaux Enregistrements (Maintenance)
 
 ```
-1. Édition fichier zone (Ansible template)
-   └─> group_vars/dns_hosts.yml
+1. Édition fichier zone (SSOT)
+   └─> Ansible/inventory/host_vars/bind9dns.yml
        └─> Ajout nouvel enregistrement :
            - name: "newapp"
              type: A
@@ -187,12 +204,12 @@
 │                                                             │
 └────────────────────────┬────────────────────────────────────┘
                          │
-                         │ Réponse DNS : 172.16.100.2
+                         │ Réponse DNS : 172.16.100.253
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ Client VM reçoit IP                                         │
 ├─────────────────────────────────────────────────────────────┤
-│ • Application se connecte à 172.16.100.2                    │
+│ • Application se connecte à 172.16.100.253                  │
 │ • Communication établie avec Harbor                         │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -256,6 +273,42 @@
 
 
 ***
+
+## 🛠️ Runbook (opérationnel)
+
+### 1) Déployer / mettre à jour Bind9
+
+Selon ton mode de déploiement :
+
+```bash
+cd Ansible
+# Mode conteneur (rôle bind9_docker)
+ansible-playbook -i inventory/hosts.yml playbooks/bind9-container.yml --limit bind9_hosts
+```
+
+Ou :
+
+```bash
+cd Ansible
+# Mode VM (rôle systemli.bind9)
+ansible-playbook -i inventory/hosts.yml playbooks/bind9-docker.yml --limit bind9_hosts
+```
+
+### 2) Modifier un enregistrement DNS (SSOT)
+
+1. Édite `Ansible/inventory/host_vars/bind9dns.yml`
+2. Incrémente le `serial` de la zone (`YYYYMMDDNN`)
+3. Relance le playbook (voir ci-dessus)
+
+### 3) Vérifier la résolution
+
+```bash
+dig +short @172.16.100.254 harbor.lab.local
+dig +short @172.16.100.254 git-lab.lab.local
+dig +short @172.16.100.254 registry.gitlab.lab.local
+```
+
+Attendu : `172.16.100.253` pour les services exposés via reverse-proxy.
 
 ## 📍 Fichiers Configuration Bind9
 
@@ -1088,4 +1141,3 @@ _ldap._tcp  IN      SRV     10 5 389 ldap.lab.local.
 ***
 
 **Bind9 est maintenant documenté de A à Z !** 🎉 DNS propagation instantanée garantie ! 🚀
-

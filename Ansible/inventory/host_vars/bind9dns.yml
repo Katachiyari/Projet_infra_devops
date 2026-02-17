@@ -31,7 +31,7 @@ bind9_zones_dynamic:
       - { label: "ubuntu-host", type: "A", rdata: "172.16.100.100" }
   - name: "lab.local"
     type: master
-    serial: 2026021302
+    serial: 2026021703
     admin: "postmaster.lab.local"
     ns_records:
       - "dns-server.lab.local"
@@ -39,7 +39,7 @@ bind9_zones_dynamic:
       - { label: "dns-server", type: "A", rdata: "172.16.100.254" }
       - { label: "harbor", type: "A", rdata: "172.16.100.253" }
       - { label: "portainer", type: "A", rdata: "172.16.100.253" }
-      - { label: "git-lab", type: "A", rdata: "172.16.100.40" }
+      - { label: "git-lab", type: "A", rdata: "172.16.100.253" }
       - { label: "gitlab", type: "CNAME", rdata: "git-lab.lab.local." }
       - { label: "registry", type: "A", rdata: "172.16.100.253" }
       - { label: "registry.gitlab", type: "A", rdata: "172.16.100.253" }
